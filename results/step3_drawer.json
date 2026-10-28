@@ -1,0 +1,41 @@
+{
+  "mechanism": {
+    "kind": "drawer",
+    "x": 0.7,
+    "y": 0.0,
+    "z": 0.4,
+    "yaw": 3.14159,
+    "radius": 0.0,
+    "friction": 3.0
+  },
+  "grasp_position_error_m": 0.0013534539790955222,
+  "wrench_test": {
+    "effort": 10.0,
+    "quantity": "F along axis",
+    "measured": -10.606034173225318,
+    "expected_range": [
+      -10.0,
+      -7.0
+    ],
+    "passed": true
+  },
+  "on_axis": {
+    "stroke": 0.2,
+    "reached": 0.20057031863978603,
+    "passed": true,
+    "mean_F_perp": 38.068433793625104,
+    "peak_F_perp": 86.17121833072433,
+    "mean_abs_F_perp_horizontal": 10.999239085348043,
+    "mean_abs_F_z": 35.844401845838156,
+    "mean_abs_F_par": 3.1120098158833858
+  },
+  "off_axis": {
+    "offset_m": 0.01,
+    "passed": true,
+    "mean_F_perp": 104.89781140726029,
+    "peak_F_perp": 249.99782050058266,
+    "mean_abs_F_perp_horizontal": 103.69602094831502,
+    "mean_abs_F_z": 13.228220846885986,
+    "mean_abs_F_par": 3.1594048623787376
+  }
+}

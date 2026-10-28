@@ -1,4 +1,4 @@
-"""Gazebo Classic check: world + FR3 (ros2_control) + mechanism.
+"""Gazebo Classic: world + FR3 (ros2_control) + mechanism + scene camera.
 
     ros2 launch sc_description gazebo.launch.py
     ros2 launch sc_description gazebo.launch.py kind:=door radius:=0.5
@@ -7,7 +7,11 @@
 Controllers: joint_state_broadcaster, gripper_controller and a temporary
 joint-space PID hold (arm_hold_controller) that returns the arm to its start
 pose after spawning. The Cartesian impedance controller replaces the hold in
-step 4; the gripper-handle weld arrives in step 3.
+step 4.
+
+This is also the base of sc_gazebo/sim.launch.py (step 3), which passes its
+own world (with the weld plugin), an IK start pose (initial_positions_file)
+and controllers:=false, because it starts the controllers itself.
 """
 
 import os
@@ -19,9 +23,9 @@ from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction,
                             RegisterEventHandler, SetEnvironmentVariable)
 from launch.event_handlers import OnProcessExit
-from launch.conditions import UnlessCondition
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -41,7 +45,8 @@ def state_publishers(context):
     share = get_package_share_directory('sc_description')
     arg = lambda name: LaunchConfiguration(name).perform(context)  # noqa: E731
     robot_urdf = render(os.path.join(share, 'urdf', 'fr3_sc.urdf.xacro'),
-                        sim_gazebo='true', robot_type=arg('robot_type'))
+                        sim_gazebo='true', robot_type=arg('robot_type'),
+                        initial_positions_file=arg('initial_positions_file'))
     mech_urdf = render(os.path.join(share, 'urdf', 'mechanism.urdf.xacro'),
                        kind=arg('kind'), x=arg('x'), y=arg('y'), z=arg('z'),
                        yaw=arg('yaw'), radius=arg('radius'), damping=arg('damping'),
@@ -64,7 +69,7 @@ def generate_launch_description():
     args = [
         DeclareLaunchArgument('robot_type', default_value='fr3'),
         DeclareLaunchArgument('kind', default_value='drawer', description='drawer | door'),
-        DeclareLaunchArgument('x', default_value='0.6'),
+        DeclareLaunchArgument('x', default_value='0.7'),
         DeclareLaunchArgument('y', default_value='0.0'),
         DeclareLaunchArgument('z', default_value='0.4'),
         DeclareLaunchArgument('yaw', default_value='3.14159'),
@@ -78,20 +83,31 @@ def generate_launch_description():
         DeclareLaunchArgument('gui', default_value='true'),
         DeclareLaunchArgument('paused', default_value='false',
                               description='start with physics paused (arm stays in its start pose)'),
+        DeclareLaunchArgument('world', default_value=PathJoinSubstitution(
+            [pkg, 'worlds', 'sc_empty.world'])),
+        DeclareLaunchArgument('initial_positions_file', default_value=PathJoinSubstitution(
+            [pkg, 'config', 'initial_positions.yaml']),
+            description='FR3 start configuration (also the go_to_start target)'),
+        DeclareLaunchArgument('controllers', default_value='true',
+                              description='spawn the controllers and run go_to_start'),
     ]
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(PathJoinSubstitution(
             [FindPackageShare('gazebo_ros'), 'launch', 'gazebo.launch.py'])),
-        launch_arguments={'world': PathJoinSubstitution([pkg, 'worlds', 'sc_empty.world']),
+        launch_arguments={'world': LaunchConfiguration('world'),
                           'gui': LaunchConfiguration('gui'),
                           'pause': LaunchConfiguration('paused')}.items())
 
     # ros2_control only updates while physics steps, so controllers cannot be
     # activated in a paused world; paused:=true is for inspecting the start pose.
+    spawn = IfCondition(PythonExpression([
+        "'", LaunchConfiguration('controllers'), "' == 'true' and '",
+        LaunchConfiguration('paused'), "' == 'false'"]))
+
     def spawner(name):
         return Node(package='controller_manager', executable='spawner',
                     arguments=[name, '--controller-manager', '/controller_manager'],
-                    condition=UnlessCondition(LaunchConfiguration('paused')))
+                    condition=spawn)
 
     hold = spawner('arm_hold_controller')  # temporary, until step 4
 
@@ -114,5 +130,6 @@ def generate_launch_description():
         # The arm sags while controllers start; drive it back to the start pose.
         RegisterEventHandler(OnProcessExit(target_action=hold, on_exit=[
             Node(package='sc_description', executable='go_to_start.py',
+                 arguments=['--positions-file', LaunchConfiguration('initial_positions_file')],
                  parameters=[{'use_sim_time': True}])])),
     ])

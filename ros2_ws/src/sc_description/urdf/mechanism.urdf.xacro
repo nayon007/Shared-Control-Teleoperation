@@ -15,7 +15,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mechanism">
 
   <xacro:arg name="kind" default="drawer"/>
-  <xacro:arg name="x" default="0.6"/>
+  <xacro:arg name="x" default="0.7"/>
   <xacro:arg name="y" default="0.0"/>
   <xacro:arg name="z" default="0.4"/>
   <xacro:arg name="yaw" default="${pi}"/>

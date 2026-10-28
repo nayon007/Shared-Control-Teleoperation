@@ -1,0 +1,41 @@
+{
+  "mechanism": {
+    "kind": "door",
+    "x": 0.7,
+    "y": 0.0,
+    "z": 0.4,
+    "yaw": 3.14159,
+    "radius": 0.6,
+    "friction": 3.0
+  },
+  "grasp_position_error_m": 0.0013518702568030747,
+  "wrench_test": {
+    "effort": 10.0,
+    "quantity": "moment about hinge",
+    "measured": -6.738779880030618,
+    "expected_range": [
+      -10.0,
+      -7.0
+    ],
+    "passed": true
+  },
+  "on_axis": {
+    "stroke": 0.6,
+    "reached": 0.5993773829440352,
+    "passed": true,
+    "mean_F_perp": 72.7395269102152,
+    "peak_F_perp": 130.80619535610626,
+    "mean_abs_F_perp_horizontal": 31.668098489530035,
+    "mean_abs_F_z": 65.16951111409591,
+    "mean_abs_F_par": 18.221748625868685
+  },
+  "off_axis": {
+    "offset_m": 0.01,
+    "passed": true,
+    "mean_F_perp": 397.9583394254027,
+    "peak_F_perp": 985.6977935651162,
+    "mean_abs_F_perp_horizontal": 285.5618758664246,
+    "mean_abs_F_z": 277.0680050567962,
+    "mean_abs_F_par": 118.22009178007234
+  }
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- sc_empty.world + the gripper-handle weld plugin (step 3). -->
+<sdf version="1.6">
+  <world name="sc_world">
+    <physics name="ode_1khz" type="ode" default="true">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode>
+        <solver><type>quick</type><iters>100</iters><sor>1.3</sor></solver>
+        <constraints><cfm>0.0</cfm><erp>0.2</erp></constraints>
+      </ode>
+    </physics>
+    <gravity>0 0 -9.81</gravity>
+
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <plugin name="sc_weld" filename="libsc_weld_plugin.so">
+      <ros><namespace>/</namespace></ros>   <!-- node sc_weld: /sc_weld/attach, ... -->
+      <robot_model>fr3</robot_model>
+      <robot_link>fr3_link7</robot_link>   <!-- hand + TCP are lumped into link7 -->
+      <target_model>mechanism</target_model>
+      <target_link>mech_moving</target_link>
+      <publish_rate>500</publish_rate>
+      <break_force>0</break_force>         <!-- 0: never open (paper: register only) -->
+    </plugin>
+  </world>
+</sdf>

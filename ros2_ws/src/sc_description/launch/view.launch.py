@@ -17,7 +17,7 @@ def generate_launch_description():
     args = [
         DeclareLaunchArgument('robot_type', default_value='fr3'),
         DeclareLaunchArgument('kind', default_value='drawer', description='drawer | door'),
-        DeclareLaunchArgument('x', default_value='0.6'),
+        DeclareLaunchArgument('x', default_value='0.7'),
         DeclareLaunchArgument('y', default_value='0.0'),
         DeclareLaunchArgument('z', default_value='0.4'),
         DeclareLaunchArgument('yaw', default_value='3.14159'),

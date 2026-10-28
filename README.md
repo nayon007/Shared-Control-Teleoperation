@@ -11,15 +11,16 @@ trigger reports opening resistance.
 - **Design document (paper):** [LaTeX_Literature_Review/main.tex](LaTeX_Literature_Review/main.tex)
 - **Stack:** ROS 2 Humble and Gazebo Classic 11 in **Docker**, on an Ubuntu 20.04 host with an RTX 4090. The same image is used later on the real FR3.
 
-| Drawer (scene camera) | Door (scene camera) |
-|---|---|
-| ![drawer](results/images/drawer_camera.png) | ![door](results/images/door_camera.png) |
-| ![drawer opening](results/images/drawer_open.gif) | ![door opening](results/images/door_open.gif) |
+| Drawer, axis towards the robot | Drawer, axis tilted 0.4 rad | Door, r = 0.6 m |
+|---|---|---|
+| ![drawer](results/images/step3_drawer_open.gif) | ![tilted drawer](results/images/step3_drawer_tilted_open.gif) | ![door](results/images/step3_door_open.gif) |
 
-*Step 2 check, 2026-10-28.* The FR3 holds its start pose under the temporary
-joint hold controller, and a test effort drives the mechanism joint: 4 N on the
-drawer, 5 Nm on the door, each against 3 N / 3 Nm of friction. The gripper is
-not yet attached to the handle; that is step 3.
+*Step 3, 2026-10-28.*
+- **Grasp:** the FR3 starts with its gripper on the handle (IK) and is welded to it.
+- **Motion:** it opens the mechanism by following the true path with the temporary joint hold controller.
+- **Measurement:** the weld measures the force on the handle, **F**.
+
+The operator and the shared-control loop arrive in steps 4–5.
 
 ---
 
@@ -70,41 +71,60 @@ host$ docker compose exec dev bash
 # 4. build the workspace (first time, or after changing code)
 container$ cd ~/SCE_571_ws/ros2_ws && colcon build --symlink-install && source install/setup.bash
 
-# 5. launch the simulation
-container$ ros2 launch sc_description gazebo.launch.py                       # FR3 + drawer
-container$ ros2 launch sc_description gazebo.launch.py kind:=door radius:=0.5  # FR3 + door
+# 5. launch the simulation: FR3 with its gripper welded to the handle (step 3)
+container$ ros2 launch sc_gazebo sim.launch.py                       # drawer, axis towards the robot
+container$ ros2 launch sc_gazebo sim.launch.py yaw:=2.74             # drawer with a tilted axis
+container$ ros2 launch sc_gazebo sim.launch.py kind:=door radius:=0.6  # door
 ```
 
-Wait about 20 s. The Gazebo window opens, the arm sags briefly, and then it
-returns to its start pose (`arm_hold_controller` followed by `go_to_start.py`).
+The terminal prints the computed start pose. After about 20 s it shows
+`[sim_startup]: welded fr3_link7 to mech_moving` and then `simulation ready`.
+The start-up sequence (§5.3) keeps the arm from sagging, and the gripper is
+attached to the handle.
 
-**Launch arguments of `gazebo.launch.py`:**
+To try the system, run in a second terminal:
+
+```bash
+container$ ros2 run sc_gazebo weld_check.py --demo      # the arm opens and closes the mechanism
+container$ ros2 run sc_gazebo weld_check.py             # full step 3 validation (§7.3)
+```
+
+**Launch arguments of `sim.launch.py`:**
 
 | Argument | Default | Meaning |
 |---|---|---|
 | `kind` | `drawer` | `drawer` or `door` |
-| `x y z yaw` | `0.6 0 0.4 3.14159` | pose of the handle at q = 0; +x of this frame is the opening direction, so `yaw` randomises the axis |
+| `x y z yaw` | `0.7 0 0.4 3.14159` | pose of the handle at q = 0; +x of this frame is the opening direction, so `yaw` randomises the axis (π = towards the robot). See §7.3 for the reachable range |
 | `radius` | `0.6` | door: hinge to handle [m] |
 | `damping` | `5.0` | joint damping [Ns/m or Nms/rad] |
 | `friction` | `3.0` | joint Coulomb friction [N or Nm] |
 | `mass` | `2.0` | drawer / door leaf mass [kg] |
+| `stroke` | 0.28 m / 0.75 rad | opening the start pose must be able to follow (trial target 0.25 m of handle travel, plus margin) |
+| `weld` | `true` | attach the gripper to the handle after start-up |
 | `robot_type` | `fr3` | `fr3`, `fr3v2` or `fr3v2_1` (must match the lab robot for hardware) |
 | `gui` | `true` | `false` for headless runs |
-| `paused` | `false` | start paused to inspect the start pose (controllers are not started while paused) |
+
+`ros2 launch sc_description gazebo.launch.py` (step 2) still starts the scene
+without the weld, with the arm in the Franka "ready" pose. It also accepts
+`paused:=true` for inspecting models.
 
 ### 1.3 Useful checks (second container terminal)
 
 ```bash
 container$ ros2 control list_controllers              # joint_state_broadcaster, gripper_controller, arm_hold_controller
+container$ ros2 topic echo /sc_weld/handle_wrench      # F (and torque) of the robot on the handle, world frame, 500 Hz
+container$ ros2 topic echo /sc_weld/attached           # true while welded
+container$ ros2 service call /sc_weld/detach std_srvs/srv/Trigger   # let go of the handle (attach: /sc_weld/attach)
 container$ ros2 topic echo /mechanism/joint_states    # ground-truth q of the drawer/door (logger only!)
 container$ ros2 topic echo /joint_states              # FR3 joints
 container$ ros2 run rqt_image_view rqt_image_view /scene_camera/image_raw   # operator view
 
-# push the drawer open with 4 N, then remove the push again (efforts add up, see §9)
+# push the mechanism with 10 N, then remove the push again (efforts add up, see §9);
+# while welded, /sc_weld/handle_wrench shows the arm resisting the push
 container$ ros2 service call /apply_joint_effort gazebo_msgs/srv/ApplyJointEffort \
-             "{joint_name: mechanism::mech_joint, effort: 4.0, duration: {sec: -1}}"
+             "{joint_name: mechanism::mech_joint, effort: 10.0, duration: {sec: -1}}"
 container$ ros2 service call /apply_joint_effort gazebo_msgs/srv/ApplyJointEffort \
-             "{joint_name: mechanism::mech_joint, effort: -4.0, duration: {sec: -1}}"
+             "{joint_name: mechanism::mech_joint, effort: -10.0, duration: {sec: -1}}"
 ```
 
 **Models only, in RViz (no physics):** drag the sliders to move the arm and the drawer or door.
@@ -127,15 +147,19 @@ processes publish a stale robot model that the next launch would spawn
 ### 1.5 Tests
 
 ```bash
-container$ cd ~/SCE_571_ws/ros2_ws && colcon test --packages-select sc_core sc_description && colcon test-result --verbose
-container$ bash ~/SCE_571_ws/scripts/smoke_gazebo.sh [kind:=door]   # headless end-to-end check
+container$ cd ~/SCE_571_ws/ros2_ws && colcon test --packages-select sc_core sc_description sc_gazebo && colcon test-result --verbose
+container$ bash ~/SCE_571_ws/scripts/smoke_gazebo.sh [kind:=door]   # step 2 scene, headless check
+host$      bash ~/SCE_571_ws/scripts/run_sim_bg.sh gui:=false       # step 3 sim headless, waits for /sim_ready
+container$ ros2 run sc_gazebo weld_check.py --seconds 10            # then the step 3 validation
+container$ ros2 run sc_gazebo reachability.py --markdown            # workspace table of §7.3 (~25 min)
 host$      cd ~/SCE_571_ws/ros2_ws/src/sc_core && python3 -m unittest discover -s test   # core only, no ROS
 ```
 
 ### 1.6 Regenerate the images and GIFs in this README
 
 ```bash
-host$ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # container must be up; writes results/images/
+host$ bash ~/SCE_571_ws/scripts/capture_step3.sh    # step 3 GIFs and images (container must be up)
+host$ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # step 2 images and GIFs
 ```
 
 ---
@@ -146,11 +170,11 @@ host$ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # container must be up; writ
 |---|------|-------|--------|
 | 0a | Host setup: Docker Engine, NVIDIA Container Toolkit, DualSense udev rule | [scripts/setup_host_docker.sh](scripts/setup_host_docker.sh) | ✅ done (Docker 28.1, NVIDIA runtime) |
 | 0b | Dev container: Humble, Gazebo 11, `ros2_control`, joy, pydualsense; GPU, X11, devices, host network | [docker/Dockerfile](docker/Dockerfile), [compose.yaml](compose.yaml) | ✅ done (`sce571/humble-dev`, RTX 4090 visible inside) |
-| 1 | Core algorithms (estimator, fixture, haptics, mapping, metrics), offline closed-loop simulator, tests | [ros2_ws/src/sc_core](ros2_ws/src/sc_core) | ✅ done; 14 tests pass on host and in the container |
+| 1 | Core algorithms (estimator, fixture, haptics, mapping, metrics), offline closed-loop simulator, tests | [ros2_ws/src/sc_core](ros2_ws/src/sc_core) | ✅ done |
 | 2 | FR3 + hand with `ros2_control` for Gazebo; drawer / door model; world; scene camera; launch files; temporary joint hold | [ros2_ws/src/sc_description](ros2_ws/src/sc_description) | ✅ done; 5 tests, headless smoke test, GUI images and GIFs above |
-| 3 | Start pose with the gripper at the handle (IK); weld plugin (fixed joint hand ↔ `mech_moving`) that also publishes the handle wrench F | `sc_gazebo` | ⬜ **next** |
-| 4 | Cartesian impedance controller (paper Eq. 7) as a C++ `ros2_control` controller on the effort interfaces (KDL in sim, Franka model on hardware); replaces `arm_hold_controller` | `sc_control` | ⬜ |
-| 5 | ROS 2 nodes: DualSense input, shared-control node (100 Hz, uses `sc_core`), haptics output (pydualsense), logger | `sc_teleop` | ⬜ |
+| 3 | Start pose with the gripper on the handle (IK in `sc_core`); weld plugin (fixed joint hand ↔ `mech_moving`) publishing the handle wrench **F**; deterministic start-up; validation, reachability study | [ros2_ws/src/sc_gazebo](ros2_ws/src/sc_gazebo) | ✅ done; all checks pass for drawer and door (§7.3) |
+| 4 | Cartesian impedance controller (paper Eq. 7, with gravity compensation τ_g) as a C++ `ros2_control` controller on the effort interfaces (KDL in sim, Franka model on hardware); replaces `arm_hold_controller` | `sc_control` | ⬜ **next** |
+| 5 | ROS 2 nodes: DualSense input, shared-control node (100 Hz, uses `sc_core`, F from `/sc_weld/handle_wrench`), haptics output (pydualsense), logger | `sc_teleop` | ⬜ |
 | 6 | Launch files and parameter YAML for direct / assisted trials, rosbag recording | `sc_bringup` | ⬜ |
 | 7 | Experiments: randomised trials, metrics, plots for the report | `sc_core.metrics` + scripts | ⬜ |
 | 8 | Real hardware: same image on the robot PC (PREEMPT_RT host kernel), `franka_ros2` + `libfranka` matched to the FR3 system image, safety limits | `sc_bringup` (hw launch) | ⬜ |
@@ -303,6 +327,10 @@ change.
 | `/arm_hold_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | temporary joint hold (until step 4) |
 | `/gripper_controller/commands` | `std_msgs/Float64MultiArray` | finger opening [m] |
 | `/apply_joint_effort` | `gazebo_msgs/srv/ApplyJointEffort` | test pushes on `mechanism::mech_joint` |
+| `/sc_weld/handle_wrench` | `geometry_msgs/WrenchStamped`, 500 Hz, best effort | **F**: force of the robot on the handle [N], world (= FR3 base) frame; torque [Nm] about the `mech_moving` origin (drawer: grasp point at q = 0; door: hinge) |
+| `/sc_weld/attached` | `std_msgs/Bool`, transient local | weld state |
+| `/sc_weld/attach`, `/sc_weld/detach` | `std_srvs/srv/Trigger` | close / open the weld |
+| `/sim_ready` | `std_msgs/Bool`, transient local | true once the start-up sequence has finished |
 
 ---
 
@@ -319,11 +347,13 @@ SCE_571_ws/                               (mounted in the container at /home/dev
 ├── scripts/                              ← helper scripts (§6)
 ├── results/
 │   ├── offline_sim.png, offline_sim_leak2.png   ← step 1 figures
-│   └── images/                           ← Gazebo images and GIFs (step 2)
+│   ├── step3_{drawer,door}.{png,json,_on.csv,_off.csv}  ← step 3 validation (weld_check.py)
+│   └── images/                           ← Gazebo images and GIFs (steps 2 and 3)
 └── ros2_ws/src/
     ├── franka_description/               ← git submodule: official FR3 model, pinned to tag 2.9.0 (do not edit)
     ├── sc_core/                          ← step 1: algorithms (pure Python, no ROS dependency)
-    └── sc_description/                   ← step 2: models, world, camera, launch
+    ├── sc_description/                   ← step 2: models, world, camera, launch
+    └── sc_gazebo/                        ← step 3: weld plugin, start pose, start-up, checks
 ```
 
 ---
@@ -342,6 +372,8 @@ SCE_571_ws/                               (mounted in the container at /home/dev
 | `mechanisms.py` | Sec. 3.2 | ground-truth prismatic / revolute paths (evaluation only) |
 | `metrics.py` | block 11 | opening time, off-axis force (true tangent), handle loss, distance |
 | `offline_sim.py` | Alg. 1 | closed-loop numpy simulation, direct vs assisted |
+| `kinematics.py` | Eq. 7 (J) | serial chain from a URDF string: forward kinematics, geometric Jacobian, damped-least-squares pose IK with joint limits, random restarts (step 3) |
+| `grasp.py` | Sec. 3.2 | handle pose and true tangent d*(q) along the drawer / door path, matching the URDF; grasp orientation; `solve_grasp` and `follow_path` (step 3) |
 
 ### 5.2 `sc_description` (step 2, ament_cmake)
 
@@ -349,19 +381,47 @@ SCE_571_ws/                               (mounted in the container at /home/dev
 |---|---|
 | `urdf/fr3_sc.urdf.xacro` | FR3 + Franka Hand from `franka_description`. `sim_gazebo:=true` adds `ros2_control` (`gazebo_ros2_control/GazeboSystem`): 7 arm joints with **effort** commands, plus fingers with position commands (joint 2 mimics joint 1) |
 | `urdf/mechanism.urdf.xacro` | `kind:=drawer` (prismatic, 0–0.35 m, 0.40×0.40×0.15 m drawer in an open carcass) or `kind:=door` (revolute about −z at `radius`, 0–90°, 0.60 m tall leaf). Links: `mech_base` (fixed), `mech_moving` (weld target in step 3), `mech_handle` (visual only). Publishes ground truth on `/mechanism/joint_states` |
-| `config/initial_positions.yaml` | start configuration (Franka "ready" pose for now) |
+| `config/initial_positions.yaml` | default start configuration (Franka "ready" pose); `sim.launch.py` replaces it with the IK start pose |
 | `config/ros2_controllers.yaml` | 1 kHz controller manager: `joint_state_broadcaster`, `gripper_controller`, `arm_hold_controller` (temporary PID hold through the effort interfaces) |
 | `worlds/sc_empty.world` | ODE, 1 ms step, real-time factor 1 |
 | `models/scene_camera/model.sdf` | fixed 1280×800 camera on `/scene_camera/image_raw` (operator view, block 10) |
-| `launch/gazebo.launch.py` | world + FR3 + mechanism + camera + controllers + `go_to_start.py` |
+| `launch/gazebo.launch.py` | world + FR3 + mechanism + camera + controllers + `go_to_start.py`; arguments `world`, `initial_positions_file`, `controllers` let `sim.launch.py` reuse it |
 | `launch/view.launch.py` | RViz with joint sliders, no physics |
 | `scripts/go_to_start.py` | sends the arm to `initial_positions.yaml` through `arm_hold_controller` |
 | `test/test_xacro.py` | models expand; `ros2_control` tags present; drawer and door open along +x of the mechanism frame |
 
 **Mechanism frame convention:** `mech_base` sits at the grasp point on the
 closed handle (q = 0), and +x is the opening direction there. The defaults put
-the drawer 0.6 m in front of the robot at a height of 0.4 m, opening towards
+the handle 0.7 m in front of the robot at a height of 0.4 m, opening towards
 it. Randomising `yaw` around π randomises the axis, as the paper requires.
+
+### 5.3 `sc_gazebo` (step 3, ament_cmake)
+
+| File | Content |
+|---|---|
+| `src/weld_plugin.cpp` | Gazebo world plugin `libsc_weld_plugin.so`. On `/sc_weld/attach` it creates a fixed joint between `fr3_link7` (Gazebo lumps link 8, the hand and the TCP into link 7) and `mech_moving` at their current relative pose. It publishes the joint's wrench as **F** on `/sc_weld/handle_wrench`. The optional `break_force` opens the weld above a threshold (default off: the paper only *registers* handle loss) |
+| `worlds/sc_weld.world` | `sc_empty.world` + the weld plugin |
+| `launch/sim.launch.py` | computes the start pose, then starts `sc_description/gazebo.launch.py` paused with that pose and this world, plus `sim_startup.py` |
+| `scripts/sim_startup.py` | start-up sequence (below) |
+| `scripts/weld_check.py` | step 3 validation (§7.3); `--demo` only opens and closes the mechanism |
+| `scripts/reachability.py` | workspace study (§7.3) |
+| `test/test_start_pose.py` | FR3 forward kinematics against the known "ready" pose; IK grasp and full stroke for the default drawer (straight and ±0.4 rad) and door |
+
+**Start pose.** The handle pose at q = 0 is placed in front of the FR3:
+- **Grasp:** the approach axis points into the mechanism, and the fingers close vertically around the horizontal bar.
+- **Search:** `solve_grasp` collects IK solutions for both symmetric hand orientations, from the "ready" pose and from 20 random starts each.
+- **Ranking:**
+  1. how far the solution can follow the opening path continuously (`stroke`);
+  2. distance to the "ready" pose, which gives a natural posture so the arm does not swing round through the mechanism;
+  3. joint-limit margin.
+
+**Start-up sequence** (`sim_startup.py`):
+1. Gazebo starts **paused**, with the FR3 already in the start pose.
+2. The controllers are loaded and configured.
+3. Physics is unpaused and the controllers are activated in one switch, so the arm has no time to sag.
+4. The arm holds the start pose to within 2 mrad (about 1.5 mm at the TCP).
+5. The weld closes, and the hold is re-commanded to the configuration actually welded, so nothing pre-loads the weld.
+6. `/sim_ready` becomes true.
 
 ---
 
@@ -375,7 +435,9 @@ it. Randomising `yaw` around π randomises the axis, as the paper requires.
 | [scripts/snapshot.py](scripts/snapshot.py) | container | save one scene-camera frame as PNG |
 | [scripts/record_gif.py](scripts/record_gif.py) | container | record the scene camera as a GIF, optionally pushing the mechanism (`--effort`) |
 | [scripts/screenshot.sh](scripts/screenshot.sh) + [xwd2png.py](scripts/xwd2png.py) | host | screenshot of a window by title (e.g. Gazebo) |
-| [scripts/capture_scenes.sh](scripts/capture_scenes.sh) | host | regenerate all README images and GIFs |
+| [scripts/run_sim_bg.sh](scripts/run_sim_bg.sh) | host | start `sim.launch.py` in the container in the background and wait for `/sim_ready` |
+| [scripts/capture_step3.sh](scripts/capture_step3.sh) | host | step 3 images and GIFs |
+| [scripts/capture_scenes.sh](scripts/capture_scenes.sh) | host | step 2 images and GIFs |
 
 ---
 
@@ -425,7 +487,7 @@ about 2–3° for r = 0.6 m, as Eq. 5 predicts.
 
 | Check | Result |
 |---|---|
-| Unit tests (`colcon test`) | 19 test cases pass (14 `sc_core`, 5 `sc_description`) |
+| Unit tests (`colcon test`) | all pass (see §7.3 for the current count) |
 | Spawn FR3 + drawer / FR3 + door | ✅ both, real-time factor 1.00 with GUI on the RTX 4090 |
 | Controllers | `joint_state_broadcaster`, `gripper_controller` and `arm_hold_controller` active; 7 arm effort interfaces available for step 4 |
 | Start pose after `go_to_start.py` | within about 4 mrad of q₀ = (0, −0.785, 0, −2.356, 0, 1.571, 0.785) |
@@ -438,6 +500,80 @@ Gazebo window (drawer scene):
 
 ![Gazebo GUI](results/images/drawer_gui.png)
 
+### 7.3 Welded grasp and handle wrench (step 3)
+
+Run with `weld_check.py --seconds 10` on the default scenes (handle at x = 0.7, z = 0.4, friction 3 N / 3 Nm):
+1. **Wrench:** push the mechanism with 10 N (drawer) or 10 Nm (door) while the arm holds still.
+2. **On-axis:** drive the arm along the true path (0.20 m or 0.60 rad).
+3. **Off-axis:** drive the same path with a horizontal error growing to 10 mm.
+
+F∥ and F⊥ use the ground-truth tangent d*(q).
+
+| Check | Drawer | Door (r = 0.6 m) |
+|---|---|---|
+| Unit tests | 33 test cases pass: 23 `sc_core`, 5 `sc_description`, 5 `sc_gazebo` | |
+| TCP on the handle after start-up | 1.4 mm ✅ | 1.4 mm ✅ |
+| Wrench for a 10 N / 10 Nm push | F along the axis = **−10.6 N** (expected −10 … −7 N, friction may carry up to 3 N) ✅ | moment about the hinge = **−6.7 Nm** (expected −10 … −7 Nm) ✅ |
+| Closed chain: arm driven along the path | the drawer opens 0.201 / 0.200 m ✅ | the door opens 0.599 / 0.600 rad ✅ |
+| On-axis: mean \|F∥\| | 3.1 N (≈ the 3 N friction being overcome) | 18 N |
+| On-axis: mean horizontal \|F⊥\| | 11 N | 32 N |
+| **10 mm off-axis: mean horizontal \|F⊥\|** | **104 N** (peak 250 N) ✅ | **286 N** ✅ |
+
+![step 3 drawer forces](results/step3_drawer.png)
+![step 3 door forces](results/step3_door.png)
+
+**What this shows:**
+- **F is measured correctly in sign and size.** Through the hinge moment for the door, the weld carries a moment as well as a force; the published torque is about the hinge.
+- **The closed kinematic chain behaves as the paper's Sec. 1 describes.** Motion along the path opens the mechanism with small forces.
+- **The paper's central problem is reproduced.** A command just 10 mm off the path produces about 10× more off-axis force (over 100 N), enough to pull the handle out of a real gripper. This is what the assisted mode will remove.
+
+**Finding 3: gravity drift of the joint hold (motivates τ_g in Eq. 7).**
+- **Symptom:** in both runs the arm also pushes the handle *vertically*, up to about 76 N at the end of the drawer stroke. The force grows with the opening, in the middle plot.
+- **Cause:** the temporary `arm_hold_controller` is a joint PID without gravity compensation. Its integral term holds the gravity load of the stretched arm, and lags as that load changes along the path.
+- **Consequence:** the off-axis check therefore uses the horizontal component, which is the direction of the injected error. The step 4 Cartesian impedance controller with τ_g removes this drift.
+
+**Finding 4: Gazebo's joint wrench convention.**
+- **What Gazebo reports:** `JointWrench.body2Force` is the force the *child* applies *on the joint*, in the child link frame. The robot's force on the handle is therefore **F = −R_child · body2Force**.
+- **How it was established:** with a 10 N push on drawers at two different yaws (`body2Force` ≈ (+9.7 … 10, …) along the drawer axis both times).
+
+**Reachability of the FR3** (`reachability.py`). The table gives the opening that the selected start pose can follow continuously: out of a full 0.35 m drawer stroke, or 1.2 rad of door opening. "yaw ±0.4" tilts the axis away from pointing at the robot.
+
+**drawer: followable opening [m] of 0.35 (handle at x, z; y = 0)**
+
+| x [m] | z [m] | yaw -0.4 | yaw +0.0 | yaw +0.4 |
+|---|---|---|---|---|
+| 0.60 | 0.30 | 0.35 | 0.13 | 0.35 |
+| 0.60 | 0.40 | 0.34 | 0.20 | 0.35 |
+| 0.60 | 0.50 | 0.35 | 0.35 | 0.35 |
+| 0.70 | 0.30 | 0.35 | 0.22 | 0.35 |
+| 0.70 | 0.40 | 0.35 | 0.31 | 0.35 |
+| 0.70 | 0.50 | 0.35 | 0.35 | 0.35 |
+| 0.80 | 0.30 | 0.35 | 0.29 | 0.35 |
+| 0.80 | 0.40 | 0.35 | 0.35 | 0.35 |
+| 0.80 | 0.50 | 0.35 | 0.35 | 0.35 |
+
+**door: followable opening [rad] of 1.20 (handle at x, z; y = 0)**
+
+| x [m] | z [m] | yaw -0.4 | yaw +0.0 | yaw +0.4 |
+|---|---|---|---|---|
+| 0.60 | 0.30 | 1.00 | 0.75 | 0.35 |
+| 0.60 | 0.40 | 0.95 | 0.75 | 0.35 |
+| 0.60 | 0.50 | 0.95 | 1.20 | 0.65 |
+| 0.70 | 0.30 | 0.95 | 1.20 | 0.40 |
+| 0.70 | 0.40 | 0.95 | 1.20 | 0.65 |
+| 0.70 | 0.50 | 0.90 | 1.20 | 0.85 |
+| 0.80 | 0.30 | 0.90 | 0.85 | 0.70 |
+| 0.80 | 0.40 | 0.90 | 0.85 | 0.95 |
+| 0.80 | 0.50 | 0.85 | 1.20 | 1.20 |
+
+A drawer pulled straight towards the robot is limited by the elbow and wrist
+limits near the base (0.31 m at the default pose), while tilted axes reach the
+full stroke. The default handle position was moved from x = 0.6 to **0.7 m**,
+so a straight drawer covers the 0.25 m trial target and the door opens more
+than 1 rad. Randomised trials should keep the handle pose within the cells
+that reach the trial target; `sim.launch.py` prints a warning when the
+requested stroke cannot be followed.
+
 ---
 
 ## 8. Changes with respect to the paper
@@ -447,7 +583,9 @@ Gazebo window (drawer scene):
 | Franka Panda | **FR3** (`franka_description` 2.9.0) | the lab's robot |
 | robosuite / MuJoCo | **ROS 2 Humble + Gazebo Classic 11 in Docker** | a path to the real robot through `ros2_control` / `franka_ros2` |
 | x_d ← x_d + Δt·v_cmd | optional off-axis leak `perp_leak` | removes the start-up residual (Finding 1); default off |
-| wrist F/T sensor | wrench of the gripper–handle weld (step 3) | it is exactly the force on the handle and needs no gravity compensation; on hardware use Franka's `O_F_ext_hat_K` |
+| wrist F/T sensor | wrench of the gripper–handle weld (`/sc_weld/handle_wrench`) | it is exactly the force on the handle and needs no gravity compensation; on hardware use Franka's `O_F_ext_hat_K` |
+| "welded grasp" in MuJoCo | Gazebo world plugin creating a fixed joint at run time | the mechanism must first be reached and the arm settled; handle loss is registered from F⊥ (optional `break_force`) |
+| Panda start pose (unspecified) | IK start pose ranked by followable stroke | the FR3's joint limits restrict which mechanism poses can be opened (§7.3) |
 | OSC from the start | temporary joint PID hold (`arm_hold_controller`) | keeps the arm up until the Cartesian impedance controller exists (step 4) |
 
 ---
@@ -465,6 +603,10 @@ Gazebo window (drawer scene):
 | `/apply_joint_effort` "succeeds" but nothing moves | `start_time = 0` means simulation time 0, so a timed effort lies in the past | use `duration: {sec: -1}` (until removed) |
 | Efforts keep acting after `/clear_joint_efforts` | efforts on a joint add up, and in our tests clearing did not remove them | remove an effort by applying its negative (as `record_gif.py` does) |
 | The Gazebo GUI ignores the camera pose from the world file | Gazebo Classic GUI behaviour | use the scene camera (`/scene_camera/image_raw`) for images |
+| `sim_startup`: `arm did not settle at the start pose` | the stretched arm needs more gravity torque than the hold PID's integral clamp allowed | the clamps were raised (`ros2_controllers.yaml`); if it persists, the mechanism pose is near the workspace border (§7.3) |
+| The weld service `/sc_weld/attach` is not found | `~/attach` is relative to the plugin node: a namespace `/sc_weld` plus the node name `sc_weld` gave `/sc_weld/sc_weld/attach` | `sc_weld.world` uses `<namespace>/</namespace>` |
+| A weld on `fr3_hand` or `fr3_link8` fails (link not found) | Gazebo lumps links connected by fixed joints into their parent | weld `fr3_link7`, which carries the hand and the TCP |
+| No messages from `/sc_weld/handle_wrench` (incompatible QoS) | it is published best effort (sensor data) | subscribe with `qos_profile_sensor_data` |
 | `docker` reports permission denied right after setup | the group change needs a new login | log out and back in (or use `sg docker -c "…"`) |
 | Very slow image build | slow network (about 0.15 MB/s here); the base image is about 1.2 GB | a better network; rebuilds reuse the cached layers |
 
@@ -481,6 +623,18 @@ Gazebo window (drawer scene):
 ---
 
 ## 11. Changelog
+
+- **2026-10-28: Step 3 done: welded grasp and handle wrench.**
+  - `sc_core`: added `kinematics.py` (URDF chain, Jacobian, IK) and `grasp.py` (handle path and tangent, grasp pose, start-pose solver), with 9 new tests.
+  - New package `sc_gazebo`: weld plugin publishing **F**, `sim.launch.py` with the IK start pose, the deterministic `sim_startup.py`, `weld_check.py`, `reachability.py`, and FR3 start-pose tests.
+  - `sc_description`:
+    - the default handle position moved to x = 0.7 m;
+    - `gazebo.launch.py` gained the `world`, `initial_positions_file` and `controllers` arguments;
+    - the hold PID integral was strengthened.
+  - Findings 3 (gravity drift of the joint hold) and 4 (Gazebo wrench convention), plus the reachability table.
+  - Scripts `run_sim_bg.sh` and `capture_step3.sh`.
+  - Step 3 GIFs and force plots.
+  - The course repository (kfupm-arm-lab, PyBullet) was reviewed. Its DualSense mapping (dead-zone 0.08; left stick x/−y, right stick −z) will be reused in step 5.
 
 - **2026-10-28: README architecture section taken from the paper.**
   - Problem statement, Fig. 1 (block diagram), Table 2 (blocks, with their implementation status), Fig. 2 (assistance geometry) and Eqs. 3–8.

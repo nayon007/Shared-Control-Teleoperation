@@ -3,7 +3,7 @@
 through arm_hold_controller. The arm sags while Gazebo starts the
 controllers, so the launch file runs this once the hold controller is active.
 
-    ros2 run sc_description go_to_start.py [--duration 3.0]
+    ros2 run sc_description go_to_start.py [--duration 3.0] [--positions-file f.yaml]
 """
 
 import argparse
@@ -22,11 +22,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--duration', type=float, default=3.0)
     ap.add_argument('--robot-type', default='fr3')
+    ap.add_argument('--positions-file', default=os.path.join(
+        get_package_share_directory('sc_description'), 'config', 'initial_positions.yaml'))
     args, _ = ap.parse_known_args()
 
-    path = os.path.join(get_package_share_directory('sc_description'),
-                        'config', 'initial_positions.yaml')
-    q0 = yaml.safe_load(open(path))['initial_positions']
+    q0 = yaml.safe_load(open(args.positions_file))['initial_positions']
     names = ['%s_joint%d' % (args.robot_type, i) for i in range(1, 8)]
 
     rclpy.init()
