@@ -1,0 +1,3 @@
+[submodule "ros2_ws/src/franka_description"]
+	path = ros2_ws/src/franka_description
+	url = https://github.com/frankaemika/franka_description.git

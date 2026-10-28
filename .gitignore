@@ -1,0 +1,36 @@
+# colcon
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# LaTeX build artifacts (keep main.tex, references.bib, main.pdf)
+LaTeX_Literature_Review/*.aux
+LaTeX_Literature_Review/*.bbl
+LaTeX_Literature_Review/*.bcf
+LaTeX_Literature_Review/*.blg
+LaTeX_Literature_Review/*.log
+LaTeX_Literature_Review/*.out
+LaTeX_Literature_Review/*.run.xml
+LaTeX_Literature_Review/*.synctex.gz
+LaTeX_Literature_Review/*.fdb_latexmk
+LaTeX_Literature_Review/*.fls
+
+# Earlier literature-search reports (not part of the published project)
+/Literature Review pdf format.pdf
+/Report Literature pdf format.pdf
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local helper files
+results/.*
+*.xwd

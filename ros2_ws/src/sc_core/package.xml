@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>sc_core</name>
+  <version>0.1.0</version>
+  <description>
+    ROS-independent core of the shared-control teleoperation project:
+    constraint estimator (Lutscher et al. 2010), confidence-weighted guidance
+    fixture, DualSense haptic mapping, metrics and an offline test simulator.
+  </description>
+  <maintainer email="53692178+nayon007@users.noreply.github.com">Md Hafizur Rahman</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-matplotlib</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

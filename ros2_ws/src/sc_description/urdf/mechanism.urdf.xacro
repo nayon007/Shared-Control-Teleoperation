@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1-DOF mechanism for the shared-control project (paper Sec. 3.2).
+
+     Frame convention: the mechanism frame M (= link mech_base) sits at the
+     grasp point on the handle with the mechanism closed (q = 0); +x_M is the
+     opening direction at q = 0. Place M in the world with x y z yaw.
+
+       kind:=drawer  prismatic joint along +x_M          q in [0, q_max] m
+       kind:=door    revolute hinge at radius r, axis -z  q in [0, q_max] rad
+
+     Links: mech_base (fixed to world), mech_moving (drawer / door leaf,
+     welded to the gripper in step 3), mech_handle (visual only).
+     Ground truth q is published on /mechanism/joint_states, which only the
+     logger may use. -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mechanism">
+
+  <xacro:arg name="kind" default="drawer"/>
+  <xacro:arg name="x" default="0.6"/>
+  <xacro:arg name="y" default="0.0"/>
+  <xacro:arg name="z" default="0.4"/>
+  <xacro:arg name="yaw" default="${pi}"/>
+  <!-- joint damping [Ns/m or Nms/rad] and Coulomb friction [N or Nm] -->
+  <xacro:arg name="damping" default="5.0"/>
+  <xacro:arg name="friction" default="3.0"/>
+  <xacro:arg name="mass" default="2.0"/>
+  <xacro:arg name="radius" default="0.6"/>   <!-- door: hinge to handle [m] -->
+
+  <xacro:property name="kind" value="$(arg kind)"/>
+  <xacro:property name="m" value="$(arg mass)"/>
+  <xacro:property name="r" value="$(arg radius)"/>
+  <xacro:property name="h" value="0.05"/>     <!-- handle stand-off from front face -->
+
+  <xacro:macro name="box_link" params="name size xyz mass material">
+    <link name="${name}">
+      <visual>
+        <origin xyz="${xyz}"/>
+        <geometry><box size="${size}"/></geometry>
+      </visual>
+      <collision>
+        <origin xyz="${xyz}"/>
+        <geometry><box size="${size}"/></geometry>
+      </collision>
+      <xacro:box_inertial size="${size}" xyz="${xyz}" mass="${mass}"/>
+    </link>
+    <gazebo reference="${name}"><material>${material}</material></gazebo>
+  </xacro:macro>
+
+  <xacro:macro name="box_inertial" params="size xyz mass">
+    <xacro:property name="s" value="${[float(v) for v in size.split()]}"/>
+    <inertial>
+      <origin xyz="${xyz}"/>
+      <mass value="${mass}"/>
+      <inertia ixx="${mass/12*(s[1]**2+s[2]**2)}" iyy="${mass/12*(s[0]**2+s[2]**2)}"
+               izz="${mass/12*(s[0]**2+s[1]**2)}" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- Horizontal bar at (hx, hy, 0) in the mech_moving frame, with two
+       stand-offs back to the front face at hx - h. -->
+  <xacro:macro name="handle" params="hx hy">
+    <link name="mech_handle">
+      <visual>
+        <origin xyz="${hx} ${hy} 0" rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="0.012" length="0.14"/></geometry>
+        <material name="steel"><color rgba="0.75 0.75 0.78 1"/></material>
+      </visual>
+      <visual>
+        <origin xyz="${hx - h/2} ${hy - 0.06} 0" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="0.008" length="${h}"/></geometry>
+        <material name="steel"/>
+      </visual>
+      <visual>
+        <origin xyz="${hx - h/2} ${hy + 0.06} 0" rpy="0 ${pi/2} 0"/>
+        <geometry><cylinder radius="0.008" length="${h}"/></geometry>
+        <material name="steel"/>
+      </visual>
+      <inertial>
+        <origin xyz="${hx} ${hy} 0"/>
+        <mass value="0.1"/>
+        <inertia ixx="1e-4" iyy="1e-4" izz="1e-4" ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+    <joint name="mech_handle_joint" type="fixed">
+      <parent link="mech_moving"/>
+      <child link="mech_handle"/>
+    </joint>
+  </xacro:macro>
+
+  <link name="world"/>
+  <link name="mech_base"/>
+  <joint name="mech_base_joint" type="fixed">
+    <parent link="world"/>
+    <child link="mech_base"/>
+    <origin xyz="$(arg x) $(arg y) $(arg z)" rpy="0 0 $(arg yaw)"/>
+  </joint>
+
+  <!-- ============================ drawer ============================ -->
+  <xacro:if value="${kind == 'drawer'}">
+    <xacro:property name="D" value="0.40"/>  <!-- depth -->
+    <xacro:property name="W" value="0.40"/>  <!-- width -->
+    <xacro:property name="H" value="0.15"/>  <!-- height -->
+    <xacro:property name="t" value="0.02"/>  <!-- carcass wall -->
+
+    <!-- carcass: top, bottom, two sides, back (open at the front) -->
+    <xacro:box_link name="mech_carcass_top" size="${D+t} ${W+2*t} ${t}"
+                    xyz="${-h-(D+t)/2} 0 ${H/2+t/2}" mass="1.0" material="Gazebo/Grey"/>
+    <xacro:box_link name="mech_carcass_bottom" size="${D+t} ${W+2*t} ${t}"
+                    xyz="${-h-(D+t)/2} 0 ${-H/2-t/2}" mass="1.0" material="Gazebo/Grey"/>
+    <xacro:box_link name="mech_carcass_left" size="${D+t} ${t} ${H}"
+                    xyz="${-h-(D+t)/2} ${W/2+t/2} 0" mass="1.0" material="Gazebo/Grey"/>
+    <xacro:box_link name="mech_carcass_right" size="${D+t} ${t} ${H}"
+                    xyz="${-h-(D+t)/2} ${-W/2-t/2} 0" mass="1.0" material="Gazebo/Grey"/>
+    <xacro:macro name="fix" params="child">
+      <joint name="${child}_joint" type="fixed">
+        <parent link="mech_base"/><child link="${child}"/>
+      </joint>
+    </xacro:macro>
+    <xacro:fix child="mech_carcass_top"/>
+    <xacro:fix child="mech_carcass_bottom"/>
+    <xacro:fix child="mech_carcass_left"/>
+    <xacro:fix child="mech_carcass_right"/>
+
+    <!-- drawer body (slightly smaller than the opening, so no contact) -->
+    <xacro:box_link name="mech_moving" size="${D} ${W-0.01} ${H-0.01}"
+                    xyz="${-h-D/2} 0 0" mass="${m}" material="Gazebo/Wood"/>
+    <joint name="mech_joint" type="prismatic">
+      <parent link="mech_base"/>
+      <child link="mech_moving"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="0.0" upper="${D-0.05}" effort="1000" velocity="1.0"/>
+      <dynamics damping="$(arg damping)" friction="$(arg friction)"/>
+    </joint>
+    <xacro:handle hx="0" hy="0"/>
+  </xacro:if>
+
+  <!-- ============================= door ============================= -->
+  <xacro:if value="${kind == 'door'}">
+    <xacro:property name="T" value="0.03"/>   <!-- leaf thickness -->
+    <xacro:property name="Wd" value="${r+0.10}"/>
+    <xacro:property name="Hd" value="0.60"/>
+
+    <!-- hinge post (fixed) -->
+    <xacro:box_link name="mech_post" size="0.04 0.04 ${Hd}"
+                    xyz="${-h-0.02} ${-r-0.03} 0" mass="1.0" material="Gazebo/Grey"/>
+    <joint name="mech_post_joint" type="fixed">
+      <parent link="mech_base"/><child link="mech_post"/>
+    </joint>
+
+    <!-- leaf: frame at the hinge, in the front plane of the leaf -->
+    <xacro:box_link name="mech_moving" size="${T} ${Wd} ${Hd}"
+                    xyz="${-T/2} ${Wd/2} 0" mass="${m}" material="Gazebo/Wood"/>
+    <joint name="mech_joint" type="revolute">
+      <parent link="mech_base"/>
+      <child link="mech_moving"/>
+      <origin xyz="${-h} ${-r} 0"/>
+      <axis xyz="0 0 -1"/>   <!-- opening moves the handle towards +x_M -->
+      <limit lower="0.0" upper="${pi/2}" effort="1000" velocity="2.0"/>
+      <dynamics damping="$(arg damping)" friction="$(arg friction)"/>
+    </joint>
+    <xacro:handle hx="${h}" hy="${r}"/>
+  </xacro:if>
+
+  <!-- ground truth for the logger only -->
+  <gazebo>
+    <plugin name="mechanism_joint_state" filename="libgazebo_ros_joint_state_publisher.so">
+      <ros>
+        <namespace>/mechanism</namespace>
+        <remapping>~/out:=joint_states</remapping>
+      </ros>
+      <update_rate>100</update_rate>
+      <joint_name>mech_joint</joint_name>
+    </plugin>
+  </gazebo>
+
+</robot>

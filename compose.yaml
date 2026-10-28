@@ -1,0 +1,52 @@
+# Development container for the SCE 571 project (ROS 2 Humble + Gazebo 11).
+#
+#   xhost +local:docker            # once per login, lets the container open windows
+#   docker compose build
+#   docker compose up -d
+#   docker compose exec dev bash   # as many terminals as you need
+#   docker compose down
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        USER_UID: ${UID:-1000}
+        USER_GID: ${GID:-1000}
+    image: sce571/humble-dev:latest
+    container_name: sce571_dev
+    stdin_open: true
+    tty: true
+
+    # Host networking: DDS discovery with nodes outside the container and,
+    # later, direct access to the Franka controller (FCI).
+    network_mode: host
+    ipc: host
+
+    # DualSense (/dev/hidraw*, /dev/input/js*) and, later, the robot's
+    # real-time requirements.
+    privileged: true
+    cap_add: [SYS_NICE]
+    ulimits:
+      rtprio: 99
+      memlock: -1
+
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-57}
+
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev:/dev
+      - ./:/home/dev/SCE_571_ws
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
