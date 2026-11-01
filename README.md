@@ -99,7 +99,7 @@ container$ ros2 run sc_gazebo baseline_direct.py --heading 2   # scripted operat
 container$ ros2 run sc_gazebo baseline_direct.py --joy         # DualSense; needs `ros2 run joy joy_node`
 ```
 
-**Controls (`--joy`, not yet tested on a controller):** left stick moves the hand in the base x/y plane, right stick (vertical) moves z, and R2 sets the speed and acts as the deadman (released = no motion). Maximum speed is 0.1 m/s.
+**Controls (`--joy`, tested with simulated stick messages only, `scripts/fake_joy.py`):** left stick moves the hand in the base x/y plane (right = +x, up = +y), right stick up moves +z, and R2 sets the speed and acts as the deadman (released or untouched = no motion). Maximum speed is 0.1 m/s. The same success and failure criteria apply. Full steps for this scenario are in [README_PHASE3.md](README_PHASE3.md).
 
 **Reset:** stop and relaunch, about 11 s. Every trial starts from this state.
 
@@ -689,6 +689,8 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
   - Wrote the Phase 3 report (`docs/phase3_report/`), edited with the avoid-ai-writing rules.
   - Gazebo replaces PyBullet for the course phases (agreed).
   - Report rewritten as an anonymous third-person research report.
+  - Added `README_PHASE3.md` (installation, launch, controls, reset), with its commands tested.
+  - Fixed the `--joy` mode: stick signs, an untouched R2 no longer counts as half throttle, and trials now end by the same criteria. Added `scripts/fake_joy.py`.
   - Added a 57 s summary video: one recorded success and one failure with a live force gauge, the pilot plot and the main result.
   - Report made self-contained (figures, table) with Gazebo screenshots, scene variants, validation plots and trial outcomes.
 

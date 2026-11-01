@@ -11,8 +11,8 @@ for the drawer; the door needs the wrist compliance of the step 4 controller.
 
 Scripted operator: full throttle at v_max along the true opening direction
 rotated horizontally by --heading degrees, the same model as the offline
-simulator. Joystick: left stick x/y in the base frame, right stick y for z,
-R2 is throttle and deadman.
+simulator. Joystick: left stick x/y in the base frame (right = +x, up = +y),
+right stick up = +z, R2 is throttle and deadman.
 
 A trial ends on success (opening >= target with no handle loss), on handle
 loss (true |F_perp|, low-passed over 50 ms, above --slip-force) or on timeout.
@@ -43,7 +43,8 @@ LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 RATE = 50.0
 LINK_SETTLE = 2.0                     # [s] of simulation time
 F_FILTER = 0.002 / (0.05 + 0.002)     # first-order low-pass, 50 ms at 500 Hz
-# joy_node axes for a DualSense under Linux (triggers rest at +1, pressed -1)
+# joy_node axes for a DualSense under Linux: sticks are +1 for left and up,
+# triggers rest at +1 and read -1 fully pressed (but 0 until first touched)
 AX_LX, AX_LY, AX_RY, AX_R2 = 0, 1, 4, 5
 
 
@@ -92,8 +93,9 @@ class Direct(Node):
 
 
 def joy_velocity(joy, v_max):
-    a = np.array([joy.axes[AX_LX], -joy.axes[AX_LY], -joy.axes[AX_RY]])
-    g = (1.0 - joy.axes[AX_R2]) / 2.0
+    a = np.array([-joy.axes[AX_LX], joy.axes[AX_LY], joy.axes[AX_RY]])
+    # An untouched trigger reads exactly 0, which must not count as half throttle.
+    g = 0.0 if joy.axes[AX_R2] == 0.0 else (1.0 - joy.axes[AX_R2]) / 2.0
     return user_velocity(a, g, v_max, dz=0.08)
 
 
@@ -172,8 +174,6 @@ def main():
         log['F_perp_true'].append(F_perp)
         log['F_par'].append(F_par)
 
-        if args.joy:
-            continue
         if np.linalg.norm(F_perp) > args.slip_force:
             status = 'handle_lost'
             break
