@@ -7,6 +7,9 @@
   <!-- fr3, fr3v2 or fr3v2_1: must match the lab robot -->
   <xacro:arg name="robot_type" default="fr3"/>
   <xacro:arg name="sim_gazebo" default="false"/>
+  <!-- Gazebo only: no gravity on the robot links, i.e. ideal gravity
+       compensation (the tau_g term of paper Eq. 7) for the joint PID baseline -->
+  <xacro:arg name="ideal_gravity_comp" default="false"/>
   <xacro:arg name="controllers_file" default="$(find sc_description)/config/ros2_controllers.yaml"/>
   <!-- Start configuration [rad]; default: gripper pointing horizontally forward -->
   <xacro:arg name="initial_positions_file" default="$(find sc_description)/config/initial_positions.yaml"/>
@@ -58,6 +61,24 @@
         <state_interface name="velocity"/>
       </joint>
     </ros2_control>
+
+    <xacro:if value="$(arg ideal_gravity_comp)">
+      <xacro:macro name="no_gravity" params="link">
+        <gazebo reference="${robot_type}_${link}"><turnGravityOff>true</turnGravityOff></gazebo>
+      </xacro:macro>
+      <xacro:no_gravity link="link0"/>
+      <xacro:no_gravity link="link1"/>
+      <xacro:no_gravity link="link2"/>
+      <xacro:no_gravity link="link3"/>
+      <xacro:no_gravity link="link4"/>
+      <xacro:no_gravity link="link5"/>
+      <xacro:no_gravity link="link6"/>
+      <xacro:no_gravity link="link7"/>
+      <xacro:no_gravity link="link8"/>
+      <xacro:no_gravity link="hand"/>
+      <xacro:no_gravity link="leftfinger"/>
+      <xacro:no_gravity link="rightfinger"/>
+    </xacro:if>
 
     <gazebo>
       <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">

@@ -46,7 +46,8 @@ def state_publishers(context):
     arg = lambda name: LaunchConfiguration(name).perform(context)  # noqa: E731
     robot_urdf = render(os.path.join(share, 'urdf', 'fr3_sc.urdf.xacro'),
                         sim_gazebo='true', robot_type=arg('robot_type'),
-                        initial_positions_file=arg('initial_positions_file'))
+                        initial_positions_file=arg('initial_positions_file'),
+                        ideal_gravity_comp=arg('ideal_gravity_comp'))
     mech_urdf = render(os.path.join(share, 'urdf', 'mechanism.urdf.xacro'),
                        kind=arg('kind'), x=arg('x'), y=arg('y'), z=arg('z'),
                        yaw=arg('yaw'), radius=arg('radius'), damping=arg('damping'),
@@ -88,6 +89,8 @@ def generate_launch_description():
         DeclareLaunchArgument('initial_positions_file', default_value=PathJoinSubstitution(
             [pkg, 'config', 'initial_positions.yaml']),
             description='FR3 start configuration (also the go_to_start target)'),
+        DeclareLaunchArgument('ideal_gravity_comp', default_value='false',
+                              description='no gravity on the robot links (tau_g of Eq. 7)'),
         DeclareLaunchArgument('controllers', default_value='true',
                               description='spawn the controllers and run go_to_start'),
     ]

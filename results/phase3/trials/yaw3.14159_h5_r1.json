@@ -1,0 +1,14 @@
+{
+ "opening_time_s": NaN,
+ "final_opening_m": 0.055716063759617074,
+ "mean_F_perp_N": 13.012799464662068,
+ "peak_F_perp_N": 30.933432452158332,
+ "handle_lost": true,
+ "handle_loss_time_s": 0.6199999999999997,
+ "status": "handle_lost",
+ "heading_deg": 5.0,
+ "yaw": 3.14159,
+ "target_m": 0.25,
+ "v_max": 0.1,
+ "duration_s": 0.6199999999999997
+}

@@ -1,0 +1,369 @@
+{
+ "n_trials": 48,
+ "outcomes": {
+  "handle_lost": 37,
+  "success": 11
+ },
+ "rows": [
+  {
+   "tilt": -0.4,
+   "h": 0.0,
+   "n": 1,
+   "success": 1,
+   "opening": 0.2513165863851788,
+   "opening_std": 0.0,
+   "peak": 4.405073573315134,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 0.0,
+   "n": 4,
+   "success": 4,
+   "opening": 0.2511554806035339,
+   "opening_std": 0.0003359011332740304,
+   "peak": 8.668539349908622,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 0.0,
+   "n": 1,
+   "success": 1,
+   "opening": 0.25127053583889786,
+   "opening_std": 0.0,
+   "peak": 4.940162997666052,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 0.25,
+   "n": 1,
+   "success": 1,
+   "opening": 0.25138376348644176,
+   "opening_std": 0.0,
+   "peak": 15.811770605794658,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 0.25,
+   "n": 1,
+   "success": 1,
+   "opening": 0.2516040433302592,
+   "opening_std": 0.0,
+   "peak": 21.627113722910433,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 0.25,
+   "n": 1,
+   "success": 1,
+   "opening": 0.2508075053813252,
+   "opening_std": 0.0,
+   "peak": 11.362041915784332,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 0.5,
+   "n": 1,
+   "success": 1,
+   "opening": 0.2514724131689518,
+   "opening_std": 0.0,
+   "peak": 29.9089693455095,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 0.5,
+   "n": 4,
+   "success": 0,
+   "opening": 0.22510266920414063,
+   "opening_std": 0.008139454712455632,
+   "peak": 30.361820160093306,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 0.5,
+   "n": 1,
+   "success": 1,
+   "opening": 0.2500151571647121,
+   "opening_std": 0.0,
+   "peak": 25.30697042254904,
+   "statuses": [
+    "success"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 0.75,
+   "n": 1,
+   "success": 0,
+   "opening": 0.19989675366815177,
+   "opening_std": 0.0,
+   "peak": 30.175826508186773,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 0.75,
+   "n": 4,
+   "success": 0,
+   "opening": 0.2029189057611976,
+   "opening_std": 0.00417744358969876,
+   "peak": 30.356280385352896,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 0.75,
+   "n": 1,
+   "success": 0,
+   "opening": 0.22400229306255426,
+   "opening_std": 0.0,
+   "peak": 30.632137529892375,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 1.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.17259734646914546,
+   "opening_std": 0.0,
+   "peak": 30.388775198372425,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 1.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.16977099488184366,
+   "opening_std": 0.0,
+   "peak": 30.13439391928703,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 1.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.19363003993038524,
+   "opening_std": 0.0,
+   "peak": 30.404502432386796,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 2.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.12914584192660478,
+   "opening_std": 0.0,
+   "peak": 30.716752302633278,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 2.0,
+   "n": 4,
+   "success": 0,
+   "opening": 0.10960367651706895,
+   "opening_std": 0.00031004225320703234,
+   "peak": 30.186765480148452,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 2.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.1263808360805143,
+   "opening_std": 0.0,
+   "peak": 30.622610592242413,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 3.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.09517149311278311,
+   "opening_std": 0.0,
+   "peak": 31.397345029181167,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 3.0,
+   "n": 4,
+   "success": 0,
+   "opening": 0.08220477670455625,
+   "opening_std": 0.0009919101589029667,
+   "peak": 30.332584824900128,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 3.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.09406542477063684,
+   "opening_std": 0.0,
+   "peak": 30.04775581703135,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 5.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.060980325946619555,
+   "opening_std": 0.0,
+   "peak": 30.111074862236485,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 5.0,
+   "n": 4,
+   "success": 0,
+   "opening": 0.055146528521093224,
+   "opening_std": 0.00034244784522721017,
+   "peak": 30.973447947563127,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 5.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.06389939976971214,
+   "opening_std": 0.0,
+   "peak": 30.032867075655002,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 10.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.03719363926441669,
+   "opening_std": 0.0,
+   "peak": 31.57408489485823,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 10.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.030983655068756725,
+   "opening_std": 0.0,
+   "peak": 32.34905525254134,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 10.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.03565681898082203,
+   "opening_std": 0.0,
+   "peak": 30.659054093219147,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": -0.4,
+   "h": 20.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.020461608077666508,
+   "opening_std": 0.0,
+   "peak": 31.77781473183476,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.0,
+   "h": 20.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.015675582348667904,
+   "opening_std": 0.0,
+   "peak": 33.949619122761376,
+   "statuses": [
+    "handle_lost"
+   ]
+  },
+  {
+   "tilt": 0.4,
+   "h": 20.0,
+   "n": 1,
+   "success": 0,
+   "opening": 0.01662146270827841,
+   "opening_std": 0.0,
+   "peak": 30.0432014248294,
+   "statuses": [
+    "handle_lost"
+   ]
+  }
+ ]
+}

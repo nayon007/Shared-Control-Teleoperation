@@ -181,6 +181,7 @@ def main():
     ap.add_argument('--offset', type=float, default=0.01, help='off-axis error [m] in test 3')
     ap.add_argument('--stroke', type=float, default=None, help='m (drawer) or rad (door)')
     ap.add_argument('--seconds', type=float, default=6.0)
+    ap.add_argument('--settle', type=float, default=10.0, help='wait after the push [s]')
     ap.add_argument('--demo', action='store_true', help='open and close on-axis, no checks')
     args, _ = ap.parse_known_args()
 
@@ -220,7 +221,7 @@ def main():
     E = 10.0                    # N (drawer) or Nm (door); well above the 3 N | 3 Nm friction
     W_before = node.mean_wrench(2.0)
     node.effort(E)
-    node.spin_for(3.0)          # let the hold controller's integral settle
+    node.spin_for(args.settle)  # let the hold controller's integral settle
     W_push = node.mean_wrench(2.0)
     node.effort(-E)
     node.spin_for(1.0)
@@ -278,7 +279,7 @@ def main():
     print('%-34s %-40s %s' % ('3 off-axis drive (%.0f mm)' % (1e3 * args.offset),
                               'horiz. |F_perp| %.1f N vs %.1f N on-axis'
                               % (np.mean(off_hor), np.mean(on_hor)), ok3))
-    print('%-34s %-40s' % ('  (vertical drift, both runs)', 'mean |F_z| %.1f / %.1f N (no tau_g yet)'
+    print('%-34s %-40s' % ('  (vertical drift, both runs)', 'mean |F_z| %.1f / %.1f N'
                            % (np.mean(np.abs(on_m[:, 5])), np.mean(np.abs(off_m[:, 5])))))
     print('\nsaved %s.{png,json,_on.csv,_off.csv}' % base)
     rclpy.shutdown()

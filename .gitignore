@@ -25,6 +25,10 @@ LaTeX_Literature_Review/*.fls
 /Literature Review pdf format.pdf
 /Report Literature pdf format.pdf
 
+docs/phase3_report/*.aux
+docs/phase3_report/*.log
+docs/phase3_report/*.out
+
 # Editors / OS
 .vscode/
 .idea/

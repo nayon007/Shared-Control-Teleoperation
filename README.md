@@ -9,6 +9,7 @@ guidance virtual fixture. Rumble reports off-axis force, and the R2 adaptive
 trigger reports opening resistance.
 
 - **Design document (paper):** [LaTeX_Literature_Review/main.tex](LaTeX_Literature_Review/main.tex)
+- **Phase 3 report:** [docs/phase3_report/phase3_report.pdf](docs/phase3_report/phase3_report.pdf) (scenario, baseline, pilot experiments)
 - **Stack:** ROS 2 Humble and Gazebo Classic 11 in **Docker**, on an Ubuntu 20.04 host with an RTX 4090. The same image is used later on the real FR3.
 
 | Drawer, axis towards the robot | Drawer, axis tilted 0.4 rad | Door, r = 0.6 m |
@@ -89,6 +90,23 @@ container$ ros2 run sc_gazebo weld_check.py --demo      # the arm opens and clos
 container$ ros2 run sc_gazebo weld_check.py             # full step 3 validation (§7.3)
 ```
 
+**Phase 3 scenario and baseline.** Use this launch for trials (see §7.4):
+
+```bash
+container$ ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
+container$ ros2 run sc_gazebo baseline_direct.py --heading 2   # scripted operator, 2 deg heading error
+container$ ros2 run sc_gazebo baseline_direct.py --joy         # DualSense; needs `ros2 run joy joy_node`
+```
+
+**Controls (`--joy`, not yet tested on a controller):** left stick moves the hand in the base x/y plane, right stick (vertical) moves z, and R2 sets the speed and acts as the deadman (released = no motion). Maximum speed is 0.1 m/s.
+
+**Reset:** stop and relaunch, about 11 s. Every trial starts from this state.
+
+```bash
+container$ bash ~/SCE_571_ws/scripts/stop_sim.sh      # then run the launch command again
+host$      bash ~/SCE_571_ws/scripts/run_sim_bg.sh gui:=false ideal_gravity_comp:=true   # same, from the host
+```
+
 **Launch arguments of `sim.launch.py`:**
 
 | Argument | Default | Meaning |
@@ -101,6 +119,7 @@ container$ ros2 run sc_gazebo weld_check.py             # full step 3 validation
 | `mass` | `2.0` | drawer / door leaf mass [kg] |
 | `stroke` | 0.28 m / 0.75 rad | opening the start pose must be able to follow (trial target 0.25 m of handle travel, plus margin) |
 | `weld` | `true` | attach the gripper to the handle after start-up |
+| `ideal_gravity_comp` | `false` | no gravity on the robot links, modelling τ_g of Eq. 7; used for all Phase 3 trials |
 | `robot_type` | `fr3` | `fr3`, `fr3v2` or `fr3v2_1` (must match the lab robot for hardware) |
 | `gui` | `true` | `false` for headless runs |
 
@@ -158,6 +177,8 @@ host$      cd ~/SCE_571_ws/ros2_ws/src/sc_core && python3 -m unittest discover -
 ### 1.6 Regenerate the images and GIFs in this README
 
 ```bash
+host$ bash ~/SCE_571_ws/scripts/run_pilot.sh        # all 48 pilot trials (~20 min, resumes; container up)
+host$ python3 ~/SCE_571_ws/scripts/analyze_pilot.py # tables and plots from the trial files
 host$ bash ~/SCE_571_ws/scripts/capture_step3.sh    # step 3 GIFs and images (container must be up)
 host$ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # step 2 images and GIFs
 ```
@@ -173,6 +194,7 @@ host$ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # step 2 images and GIFs
 | 1 | Core algorithms (estimator, fixture, haptics, mapping, metrics), offline closed-loop simulator, tests | [ros2_ws/src/sc_core](ros2_ws/src/sc_core) | ✅ done |
 | 2 | FR3 + hand with `ros2_control` for Gazebo; drawer / door model; world; scene camera; launch files; temporary joint hold | [ros2_ws/src/sc_description](ros2_ws/src/sc_description) | ✅ done; 5 tests, headless smoke test, GUI images and GIFs above |
 | 3 | Start pose with the gripper on the handle (IK in `sc_core`); weld plugin (fixed joint hand ↔ `mech_moving`) publishing the handle wrench **F**; deterministic start-up; validation, reachability study | [ros2_ws/src/sc_gazebo](ros2_ws/src/sc_gazebo) | ✅ done; all checks pass for drawer and door (§7.3) |
+| P3 | Course Phase 3: scenario specification, direct teleoperation baseline, reset, 48 pilot trials, report | [docs/phase3_report](docs/phase3_report), `baseline_direct.py`, [results/phase3](results/phase3) | ✅ done (§7.4); DualSense input untested |
 | 4 | Cartesian impedance controller (paper Eq. 7, with gravity compensation τ_g) as a C++ `ros2_control` controller on the effort interfaces (KDL in sim, Franka model on hardware); replaces `arm_hold_controller` | `sc_control` | ⬜ **next** |
 | 5 | ROS 2 nodes: DualSense input, shared-control node (100 Hz, uses `sc_core`, F from `/sc_weld/handle_wrench`), haptics output (pydualsense), logger | `sc_teleop` | ⬜ |
 | 6 | Launch files and parameter YAML for direct / assisted trials, rosbag recording | `sc_bringup` | ⬜ |
@@ -404,6 +426,7 @@ it. Randomising `yaw` around π randomises the axis, as the paper requires.
 | `launch/sim.launch.py` | computes the start pose, then starts `sc_description/gazebo.launch.py` paused with that pose and this world, plus `sim_startup.py` |
 | `scripts/sim_startup.py` | start-up sequence (below) |
 | `scripts/weld_check.py` | step 3 validation (§7.3); `--demo` only opens and closes the mechanism |
+| `scripts/baseline_direct.py` | Phase 3 baseline: direct teleoperation (v_c = u) through IK and the joint controller, scripted or DualSense; applies the success and failure criteria |
 | `scripts/reachability.py` | workspace study (§7.3) |
 | `test/test_start_pose.py` | FR3 forward kinematics against the known "ready" pose; IK grasp and full stroke for the default drawer (straight and ±0.4 rad) and door |
 
@@ -436,6 +459,8 @@ it. Randomising `yaw` around π randomises the axis, as the paper requires.
 | [scripts/record_gif.py](scripts/record_gif.py) | container | record the scene camera as a GIF, optionally pushing the mechanism (`--effort`) |
 | [scripts/screenshot.sh](scripts/screenshot.sh) + [xwd2png.py](scripts/xwd2png.py) | host | screenshot of a window by title (e.g. Gazebo) |
 | [scripts/run_sim_bg.sh](scripts/run_sim_bg.sh) | host | start `sim.launch.py` in the container in the background and wait for `/sim_ready` |
+| [scripts/run_pilot.sh](scripts/run_pilot.sh) | host | Phase 3 pilot trials, each from a full reset |
+| [scripts/analyze_pilot.py](scripts/analyze_pilot.py) | host | pilot summary, table and plots |
 | [scripts/capture_step3.sh](scripts/capture_step3.sh) | host | step 3 images and GIFs |
 | [scripts/capture_scenes.sh](scripts/capture_scenes.sh) | host | step 2 images and GIFs |
 
@@ -574,6 +599,38 @@ than 1 rad. Randomised trials should keep the handle pose within the cells
 that reach the trial target; `sim.launch.py` prints a warning when the
 requested stroke cannot be followed.
 
+### 7.4 Phase 3 pilot experiments
+
+**Task:** open the drawer 0.25 m. **Failure:** true |F⊥| (50 ms filter) above 30 N (handle loss), or 15 s timeout. The 30 N limit is a design assumption, not a measurement on the real gripper. **Baseline:** direct teleoperation, scripted operator at 0.1 m/s with a fixed heading error, ideal gravity compensation. **Design:** 10 heading errors × 3 axis tilts, with 6 conditions repeated four times: 48 trials, each from a full reset (mean reset 10.9 s).
+
+| Heading error | Success | Opening reached (straight axis) |
+|---|---|---|
+| 0° | 6/6 | 0.251 m |
+| 0.25° | 3/3 | 0.252 m |
+| 0.5° | 2/6 (both tilted axes; straight axis 0/4) | 0.225 ± 0.008 m |
+| 0.75° | 0/6 | 0.203 ± 0.004 m |
+| 1° | 0/3 | 0.170 m |
+| 2° | 0/6 | 0.110 m |
+| 3° | 0/6 | 0.082 m |
+| 5° | 0/6 | 0.055 m |
+| 10° | 0/3 | 0.031 m |
+| 20° | 0/3 | 0.016 m |
+
+The task is feasible but has almost no margin: the handle is lost after 2.7–5.7 mm of sideways error, because the joint-controlled arm is stiff.
+
+| Success | Failure (2° heading error) |
+|---|---|
+| ![0 deg](results/phase3/baseline_h0.gif) | ![2 deg](results/phase3/baseline_h2.gif) |
+
+![pilot outcomes](results/phase3/pilot_outcomes.png)
+
+**Open points:**
+- The weld force read 9–19% high against a known 10 N push; the cause is not known.
+- An abrupt force jump near 0.20 m of opening in the 0.5° straight trials is unexplained.
+- No human operator has run the task.
+
+The first pilot run was discarded: commands were lost until ROS 2 discovery finished, causing false early failures. `baseline_direct.py` now waits for the link, and all 48 trials were rerun.
+
 ---
 
 ## 8. Changes with respect to the paper
@@ -604,6 +661,7 @@ requested stroke cannot be followed.
 | Efforts keep acting after `/clear_joint_efforts` | efforts on a joint add up, and in our tests clearing did not remove them | remove an effort by applying its negative (as `record_gif.py` does) |
 | The Gazebo GUI ignores the camera pose from the world file | Gazebo Classic GUI behaviour | use the scene camera (`/scene_camera/image_raw`) for images |
 | `sim_startup`: `arm did not settle at the start pose` | the stretched arm needs more gravity torque than the hold PID's integral clamp allowed | the clamps were raised (`ros2_controllers.yaml`); if it persists, the mechanism pose is near the workspace border (§7.3) |
+| A trial fails early with the opening still at 0 | commands were sent before ROS 2 discovery connected the new publisher to the controller | fixed: `baseline_direct.py` holds for 2 s of simulation time after the link is up |
 | The weld service `/sc_weld/attach` is not found | `~/attach` is relative to the plugin node: a namespace `/sc_weld` plus the node name `sc_weld` gave `/sc_weld/sc_weld/attach` | `sc_weld.world` uses `<namespace>/</namespace>` |
 | A weld on `fr3_hand` or `fr3_link8` fails (link not found) | Gazebo lumps links connected by fixed joints into their parent | weld `fr3_link7`, which carries the hand and the TCP |
 | No messages from `/sc_weld/handle_wrench` (incompatible QoS) | it is published best effort (sensor data) | subscribe with `qos_profile_sensor_data` |
@@ -623,6 +681,12 @@ requested stroke cannot be followed.
 ---
 
 ## 11. Changelog
+
+- **2026-11-01: Phase 3 complete.**
+  - Added the direct teleoperation baseline (`baseline_direct.py`), the `ideal_gravity_comp` option and the success and failure criteria.
+  - Ran 48 pilot trials (`run_pilot.sh`, `analyze_pilot.py`, `results/phase3/`).
+  - Wrote the Phase 3 report (`docs/phase3_report/`), edited with the avoid-ai-writing rules.
+  - Gazebo replaces PyBullet for the course phases (agreed).
 
 - **2026-10-28: Step 3 done: welded grasp and handle wrench.**
   - `sc_core`: added `kinematics.py` (URDF chain, Jacobian, IK) and `grasp.py` (handle path and tangent, grasp pose, start-pose solver), with 9 new tests.

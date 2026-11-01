@@ -1,0 +1,369 @@
+% SCE 571 Phase 3 report. Compile from this folder: pdflatex phase3_report (twice).
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc}
+\usepackage{subcaption}
+\usepackage{adjustbox}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage[capitalise,noabbrev]{cleveref}
+\usepackage{microtype}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{xcolor}
+
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\Fperp}{F_{\perp}}
+\newcommand{\Fpar}{F_{\parallel}}
+\graphicspath{{../../results/phase3/}{../../results/images/}}
+
+\title{Shared-Control Teleoperation of Unknown Constrained Mechanisms\\[4pt]
+  \large Phase 3 Report: Scenario, Baseline and Pilot Experiments}
+\author{Md Hafizur Rahman\\SCE 571, Robot Dynamics and Control}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A robot arm that holds a drawer handle forms a closed kinematic chain, so any motion
+command off the drawer axis turns into force at the handle. We built this scenario in
+Gazebo Classic with a simulated Franka Research 3 welded to a drawer whose axis can be
+changed between trials. We defined a task (open the drawer by 0.25~m without exceeding
+30~N of off-axis force at the handle), a direct teleoperation baseline and a reset
+procedure of about 11~s. We then ran 48 pilot trials with a scripted operator at ten
+heading errors and three axis directions. All 9 trials at or below 0.25$^\circ$ succeeded,
+2 of 6 succeeded at 0.5$^\circ$, and none of the 33 trials at or above 0.75$^\circ$ did.
+The handle was lost after 2.7 to 5.7~mm of sideways error. The task is feasible, and the
+baseline has almost no margin, which gives the planned shared-control method a clear target.
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+
+Our earlier literature review proposed a shared-control architecture for opening drawers
+and doors with an unknown axis. An operator commands Cartesian velocity with a DualSense
+controller, an online estimator follows the direction the mechanism allows
+\cite{lutscher2010control}, and an assisted mode projects the command onto that direction
+as a guidance virtual fixture \cite{marayong2003spatial}. Phase 3 prepares the comparison:
+it fixes the task, the metrics and the baseline before any assistance is implemented.
+
+This report covers the four Phase 3 deliverables, listed in \cref{tab:deliverables}. The
+simulator is Gazebo Classic 11 with ROS~2 Humble instead of PyBullet, because the same
+\texttt{ros2\_control} interfaces carry over to the laboratory robot. All code, data and
+installation steps are in the project repository
+(\url{https://github.com/nayon007/Shared-Control-Teleoperation}).
+
+\begin{table}[ht]
+\centering
+\caption{Phase 3 deliverables and where each one is found.}\label{tab:deliverables}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\toprule
+Deliverable & Location \\
+\midrule
+Executable scenario and README (installation, launch, controls, reset) &
+  Repository, \texttt{README.md} Section~1; \cref{sec:running} here \\
+Scenario specification & \cref{sec:scenario} \\
+Baseline controller & \cref{sec:baseline} \\
+Pilot experiments & \cref{sec:pilot} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Scenario specification}\label{sec:scenario}
+
+\subsection{Control challenge}
+
+Once the gripper holds the handle, the end-effector can only move along the mechanism's
+path. Let $d^\star$ be the unit opening direction and $F$ the force the robot applies to
+the handle. The along-path and off-axis components are
+\begin{equation}\label{eq:split}
+  \Fpar = {d^\star}^{\top} F, \qquad
+  \Fperp = \bigl(I - d^\star {d^\star}^{\top}\bigr) F .
+\end{equation}
+A command with a component outside $d^\star$ cannot be executed. It accumulates as
+tracking error, and the controller converts that error into $\Fperp$. The scenario is built
+so that this effect decides the outcome of a trial.
+
+\subsection{Scene and initial conditions}
+
+\Cref{fig:scene} shows the scene and \cref{tab:params} lists its parameters. The FR3 base is
+fixed at the world origin. The drawer runs on a prismatic joint in a fixed carcass, and its
+axis is set by the yaw angle of the mechanism frame. At the start of a trial the drawer is
+closed ($q = 0$) and the tool centre point is on the handle bar, with the approach axis
+pointing into the drawer and the fingers closing vertically. An inverse kinematics solver
+selects the arm configuration that can follow the required stroke. For the straight axis
+this is $q_{\mathrm{arm}} = (0.788, 0.675, -1.001, -2.111, -0.097, 4.142, -0.177)$~rad.
+
+\begin{figure}[ht]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{scene_start.png}
+  \caption{Start of a trial in Gazebo.}\label{fig:scene-shot}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+  \centering
+  \adjustbox{max width=\linewidth}{%
+  \begin{tikzpicture}[>={Latex[length=2.2mm]},font=\small]
+    \fill (0,0) circle (2.5pt);
+    \node[below] at (0,-0.1) {FR3 base};
+    \coordinate (H) at (5,0);
+    \draw[thick,fill=black!8] (5.3,-1.3) rectangle (7.6,1.3);
+    \node at (6.45,0) {drawer};
+    \draw[thick] (5,-0.6) -- (5,0.6);
+    \draw[thick] (5,0.5) -- (5.3,0.5);
+    \draw[thick] (5,-0.5) -- (5.3,-0.5);
+    \node[above left] at (5.2,0.6) {handle};
+    \draw[->,very thick,green!50!black] (H) -- (2.2,0) node[above,pos=0.65] {$d^\star$};
+    \draw[->,thick,blue!70!black] (H) -- ++(195:2.9) node[below left=-1pt] {$u$};
+    \draw[gray] (3.7,0) arc (180:195:1.3);
+    \node[gray,left] at (3.65,-0.2) {\footnotesize error};
+    \draw[<->,gray] (0,-1.3) -- (5,-1.3) node[midway,below] {0.7 m};
+  \end{tikzpicture}}
+  \caption{Top view. The command $u$ misses $d^\star$ by the heading error. The axis $d^\star$
+    can also be tilted by $\pm 0.4$~rad.}\label{fig:scene-top}
+\end{subfigure}
+\caption{Pilot scenario: FR3 welded to the drawer handle.}\label{fig:scene}
+\end{figure}
+
+\begin{table}[ht]
+\centering
+\caption{Scenario parameters.}\label{tab:params}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}X l}
+\toprule
+Parameter & Value \\
+\midrule
+Physics & ODE, 1~ms step, real-time factor 1 \\
+Handle position at $q=0$ & $(0.7, 0, 0.4)$~m \\
+Drawer travel & 0 to 0.35~m \\
+Drawer mass, joint damping, Coulomb friction & 2~kg, 5~Ns/m, 3~N \\
+Axis direction & towards the robot, tilted by 0 or $\pm 0.4$~rad \\
+Grasp & fixed joint between hand and drawer, closed at start-up \\
+Force signal & wrench of that joint, 500~Hz, 50~ms low-pass filter \\
+Constraints & FR3 joint limits; drawer travel limits \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Task sequence}
+
+\begin{enumerate}
+\item Gazebo starts paused with the arm in the start configuration.
+\item The controllers load, then physics and controllers start together, so the arm does
+  not sag.
+\item The arm settles to within 2~mrad of the start configuration and the weld closes.
+\item The operator commands motion and the trial clock runs.
+\item The trial ends on one of the conditions below and the scene is reset.
+\end{enumerate}
+
+\subsection{Success and failure criteria}
+
+A trial succeeds when the opening reaches 0.25~m with $\norm{\Fperp}$ below 30~N throughout.
+It fails on handle loss, when the filtered true $\norm{\Fperp}$ exceeds 30~N, or on a timeout
+of 15~s. Because the grasp is welded, handle loss is registered and ends the trial. The
+forces use the ground-truth tangent, which is hidden from the controller. The 30~N limit is a
+design assumption carried over from our review; we have not measured it on the real
+gripper. The metrics are the ones the later comparison will use: outcome, opening reached,
+opening time, and peak and mean $\norm{\Fperp}$.
+
+\subsection{Reset and repeatability}
+
+A reset stops every simulation process and relaunches the scene. Over the 48 pilot trials it
+took 10.9~s on average. Four repeats of the same trial gave openings within 1~mm of each
+other at 0$^\circ$, 2$^\circ$ and 5$^\circ$ of heading error and within 2.6~mm at 3$^\circ$. Near
+the failure boundary the spread grows to 10~mm at 0.75$^\circ$ and 17~mm at 0.5$^\circ$, so the
+simulation is repeatable but not exactly deterministic there.
+
+\section{Baseline controller}\label{sec:baseline}
+
+The baseline is the direct mode of our architecture, with no estimator and no assistance.
+The commanded velocity equals the operator velocity $u$, and it is integrated into a
+tool-centre-point set-point at 50~Hz,
+\begin{equation}\label{eq:baseline}
+  v_c = u, \qquad x_{d,k+1} = x_{d,k} + \Delta t\, v_c .
+\end{equation}
+Orientation stays fixed. Inverse kinematics converts $x_d$ to joint targets, and a joint PID
+controller tracks them through the torque interface. This differs from the planned law in
+one way that matters for the results: the joints are stiff, so the arm is not the compliant
+Cartesian impedance of the review \cite{hogan1985impedance,khatib1987unified}. That
+controller is the next implementation step.
+
+The planned law includes gravity compensation. With a plain joint PID, gravity load drift
+alone pushed the handle by up to 76~N with no heading error, so every trial would have failed
+for an unrelated reason. We therefore switch gravity off on the robot links in Gazebo, which
+models ideal compensation.
+
+The pilot operator is scripted: full speed (0.1~m/s) along $d^\star$ rotated horizontally by a
+fixed heading error, with no correction during the trial. This is the same model as our
+offline simulator. A DualSense input mode shares the same code path, but no controller was
+connected during this work, so that mode has not been tested.
+
+\Cref{tab:validation} checks the scene with the baseline controller configuration. The weld
+force matched a known push on the drawer to within 9\%. The door entry supports its later
+use as an extension; the baseline itself handles only the drawer, because a fixed
+orientation cannot follow a door's rotation.
+
+\begin{table}[ht]
+\centering
+\caption{Scene validation. Off-axis force is the mean horizontal $\norm{\Fperp}$.}
+\label{tab:validation}
+\begin{tabular}{lll}
+\toprule
+Check & Drawer & Door ($r = 0.6$ m) \\
+\midrule
+Tool centre point to handle & 0.4 mm & 0.2 mm \\
+Reading for a 10 N (10 Nm) push & $-10.9$ N & $-6.9$ Nm about the hinge \\
+Expected reading (friction may carry 3) & $-10$ to $-7$ N & $-10$ to $-7$ Nm \\
+Arm driven along the true path & 0.200 of 0.200 m & 0.601 of 0.600 rad \\
+Off-axis force on the true path & 1.2 N & 3.6 N \\
+Off-axis force with 10 mm of error & 87 N & 271 N \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Pilot experiments}\label{sec:pilot}
+
+\subsection{Design}
+
+We asked whether the task is neither trivial nor impossible for the baseline. We varied the
+heading error over ten values from 0$^\circ$ to 20$^\circ$ and the axis tilt over three
+values, giving 30 conditions, and repeated six conditions on the straight axis to four trials
+each. That makes 48 trials, each from a full reset.
+
+\subsection{Results}
+
+\Cref{tab:pilot} and \cref{fig:outcomes} give the outcomes: 11 trials succeeded and 37 ended in
+handle loss. All 9 trials at or below 0.25$^\circ$ reached the target, in 2.56~s. At
+0.5$^\circ$ the result depended on the axis: both tilted trials succeeded and all four
+straight trials failed. From 0.75$^\circ$ upwards all 33 trials failed. The opening reached
+fell steadily with heading error, from about 0.20~m at 0.75$^\circ$ to about 0.02~m at
+20$^\circ$.
+
+\begin{table}[ht]
+\centering
+\caption{Pilot results by heading error. Opening is in metres, as mean $\pm$ standard
+deviation for the four-trial conditions. The last column is the largest peak in the row. A
+success needs 0.25~m.}\label{tab:pilot}
+\begin{tabularx}{\linewidth}{c c *{3}{>{\centering\arraybackslash}X} c}
+\toprule
+Heading [deg] & Success & Tilt $-0.4$ rad & Tilt 0 & Tilt $+0.4$ rad & Peak $\norm{\Fperp}$ [N] \\
+\midrule
+\input{../../results/phase3/pilot_table.tex}
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{pilot_outcomes.png}
+\caption{All 48 trials. Left: opening reached. Right: peak off-axis force. Heading axis is
+linear below 0.5$^\circ$ and logarithmic above.}\label{fig:outcomes}
+\end{figure}
+
+\Cref{fig:traces} shows why. Opening speed is nearly the same in all trials, since the drawer
+follows whatever the arm does along its axis. The off-axis force separates them: it grows as
+the sideways error accumulates. Multiplying the opening by the tangent of the heading error
+gives the sideways error at the moment of loss on the straight axis: 2.7~mm at 0.75$^\circ$,
+rising to 5.7~mm at 20$^\circ$. The stiff baseline therefore has a tolerance of a few
+millimetres.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{pilot_traces.png}
+\caption{Straight axis. Left: off-axis force, with the 30~N limit dashed. Right: opening, with
+the target dashed.}\label{fig:traces}
+\end{figure}
+
+\subsection{Interpretation}
+
+The task is not impossible, since the baseline succeeds repeatably with a well-aligned
+command. It is not trivial, since a 0.75$^\circ$ error already fails. We expect an error of that
+size to be hard to avoid with a thumbstick, but no operator has tested this yet. The failures
+come from the off-axis part of the command, which is the part the assisted mode removes, so the
+scenario suits the planned comparison.
+
+The boundary will move with the controller. For the 400~N/m translational stiffness used in
+our offline simulator, a 30~N limit corresponds to 75~mm of error instead of a few
+millimetres, so direct control should tolerate a much larger heading error. This is an
+estimate, and the pilots must be repeated once the impedance controller exists.
+
+\subsection{Limitations}
+
+\begin{itemize}
+\item No human operator took part. The scripted operator never corrects itself, so these
+  results bound the difficulty from one side and say nothing about human performance.
+\item The arm is stiffer than the planned controller, and the gravity compensation is ideal.
+\item The weld force read 9 to 19\% high against a 10~N push (five readings between $-10.9$ and
+  $-11.9$~N). We have not found the cause. Near the 30~N limit this could shift a borderline
+  outcome.
+\item In the 0.5$^\circ$ straight trials the force jumps abruptly near 0.20~m of opening
+  (\cref{fig:traces}), with a smaller bump in the 0$^\circ$ trial. We have not explained it, and
+  it may account for the difference between straight and tilted axes at that heading.
+\item Most tilted conditions ran once, so their spread is unknown.
+\item An early version of the baseline started the trial clock before commands reached the
+  controller, which produced spurious early failures in five trials. We fixed this and reran
+  all 48 trials; the results here come only from the rerun.
+\end{itemize}
+
+\section{Running the scenario}\label{sec:running}
+
+The repository \texttt{README.md} gives the full steps. Inside the project container:
+
+\begin{verbatim}
+ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
+ros2 run sc_gazebo baseline_direct.py --heading 2   # scripted trial
+ros2 run sc_gazebo baseline_direct.py --joy         # DualSense (untested)
+bash ~/SCE_571_ws/scripts/stop_sim.sh               # reset, then relaunch
+\end{verbatim}
+
+\texttt{scripts/run\_pilot.sh} repeats all 48 trials and \texttt{scripts/analyze\_pilot.py}
+regenerates \cref{tab:pilot} and the figures from the logged data.
+
+\section{Conclusion and next steps}\label{sec:conclusion}
+
+The scenario, the baseline and the evaluation are in place and repeatable. The pilots show
+that a closed-chain drawer task in Gazebo succeeds at small heading errors and fails from
+0.75$^\circ$ upwards, and that the failures come from off-axis force, the quantity the
+project sets out to reduce. Next we will implement the Cartesian impedance controller, repeat
+these pilots with it, test the DualSense path with a human operator, and then add the
+estimator and the assisted mode under the same task and metrics.
+
+\begin{thebibliography}{9}
+
+\bibitem[Hogan(1985)]{hogan1985impedance}
+N.~Hogan,
+``Impedance control: An approach to manipulation: Part I, Theory,''
+\textit{ASME Journal of Dynamic Systems, Measurement, and Control},
+vol.~107, no.~1, pp.~1--7, 1985.
+
+\bibitem[Khatib(1987)]{khatib1987unified}
+O.~Khatib,
+``A unified approach for motion and force control of robot manipulators: The operational
+space formulation,''
+\textit{IEEE Journal on Robotics and Automation},
+vol.~3, no.~1, pp.~43--53, 1987.
+
+\bibitem[Lutscher et~al.(2010)]{lutscher2010control}
+E.~Lutscher, M.~Lawitzky, G.~Cheng, and S.~Hirche,
+``A control strategy for operating unknown constrained mechanisms,''
+in \textit{Proceedings of the IEEE International Conference on Robotics and Automation (ICRA)},
+Anchorage, AK, USA, 2010.
+
+\bibitem[Marayong et~al.(2003)]{marayong2003spatial}
+P.~Marayong, M.~Li, A.~M.~Okamura, and G.~D.~Hager,
+``Spatial motion constraints: Theory and demonstrations for robot guidance using virtual
+fixtures,''
+in \textit{Proceedings of the IEEE International Conference on Robotics and Automation (ICRA)},
+2003.
+
+\end{thebibliography}
+
+\end{document}

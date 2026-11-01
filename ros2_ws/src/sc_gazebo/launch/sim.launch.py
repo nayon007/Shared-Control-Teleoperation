@@ -73,7 +73,7 @@ def start_pose(context):
     share = get_package_share_directory('sc_gazebo')
     base = os.path.join(get_package_share_directory('sc_description'), 'launch', 'gazebo.launch.py')
     forwarded = {k: arg(k) for k in ('robot_type', 'kind', 'x', 'y', 'z', 'yaw', 'radius',
-                                     'damping', 'friction', 'mass', 'gui')}
+                                     'damping', 'friction', 'mass', 'gui', 'ideal_gravity_comp')}
     forwarded.update({'world': os.path.join(share, 'worlds', 'sc_weld.world'),
                       'initial_positions_file': out,
                       'paused': 'true',
@@ -105,6 +105,8 @@ def generate_launch_description():
         DeclareLaunchArgument('friction', default_value='3.0'),
         DeclareLaunchArgument('mass', default_value='2.0'),
         DeclareLaunchArgument('gui', default_value='true'),
+        DeclareLaunchArgument('ideal_gravity_comp', default_value='false',
+                              description='no gravity on the robot links (tau_g of Eq. 7)'),
         DeclareLaunchArgument('weld', default_value='true',
                               description='weld the hand to the handle after start-up'),
         DeclareLaunchArgument('stroke', default_value='',

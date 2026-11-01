@@ -21,6 +21,7 @@ ament_target_dependencies(sc_weld_plugin
 install(TARGETS sc_weld_plugin LIBRARY DESTINATION lib)
 install(DIRECTORY worlds launch config DESTINATION share/${PROJECT_NAME})
 install(PROGRAMS scripts/sim_startup.py scripts/weld_check.py scripts/reachability.py
+  scripts/baseline_direct.py
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
