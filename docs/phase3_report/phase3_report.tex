@@ -1,4 +1,5 @@
-% SCE 571 Phase 3 report. Compile from this folder: pdflatex phase3_report (twice).
+% SCE 571 Phase 3 report. Self-contained: this file, pilot_table.tex and figures/.
+% Compile from this folder: pdflatex phase3_report.tex (twice), or upload the folder to Overleaf.
 \documentclass[11pt,a4paper]{article}
 
 \usepackage{amsmath, amssymb, amsthm, mathtools}
@@ -23,7 +24,7 @@
 \newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
 \newcommand{\Fperp}{F_{\perp}}
 \newcommand{\Fpar}{F_{\parallel}}
-\graphicspath{{../../results/phase3/}{../../results/images/}}
+\graphicspath{{figures/}}
 
 \title{Shared-Control Teleoperation of Unknown Constrained Mechanisms\\[4pt]
   \large Phase 3 Report: Scenario, Baseline and Pilot Experiments}
@@ -134,6 +135,30 @@ this is $q_{\mathrm{arm}} = (0.788, 0.675, -1.001, -2.111, -0.097, 4.142, -0.177
 \caption{Pilot scenario: FR3 welded to the drawer handle.}\label{fig:scene}
 \end{figure}
 
+\Cref{fig:gui} shows the running simulation. The axis direction and the mechanism are launch
+arguments, so the same procedure sets up the tilted drawer and the door in \cref{fig:variants}.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.7\textwidth]{gazebo_window.png}
+\caption{Gazebo window (cropped) with the FR3 welded to the handle of the closed drawer.}\label{fig:gui}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{scene_tilted.png}
+  \caption{Drawer axis tilted by $-0.4$~rad.}\label{fig:variant-tilted}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{scene_door.png}
+  \caption{Door, radius 0.6~m (planned extension).}\label{fig:variant-door}
+\end{subfigure}
+\caption{Scene variants, from the fixed scene camera.}\label{fig:variants}
+\end{figure}
+
 \begin{table}[ht]
 \centering
 \caption{Scenario parameters.}\label{tab:params}
@@ -229,6 +254,26 @@ Off-axis force with 10 mm of error & 87 N & 271 N \\
 \end{tabular}
 \end{table}
 
+\Cref{fig:validation} gives the forces behind the last two rows of \cref{tab:validation}. On the
+true path the off-axis force stays small; with an injected error it rises along the opening.
+
+\begin{figure}[ht]
+\centering
+\begin{subfigure}{\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{validation_drawer.png}
+  \caption{Drawer.}
+\end{subfigure}
+
+\begin{subfigure}{\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{validation_door.png}
+  \caption{Door.}
+\end{subfigure}
+\caption{Validation drives with the arm following the path, with and without a horizontal error
+that grows to 10~mm.}\label{fig:validation}
+\end{figure}
+
 \section{Pilot experiments}\label{sec:pilot}
 
 \subsection{Design}
@@ -256,7 +301,7 @@ success needs 0.25~m.}\label{tab:pilot}
 \toprule
 Heading [deg] & Success & Tilt $-0.4$ rad & Tilt 0 & Tilt $+0.4$ rad & Peak $\norm{\Fperp}$ [N] \\
 \midrule
-\input{../../results/phase3/pilot_table.tex}
+\input{pilot_table.tex}
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -280,6 +325,23 @@ millimetres.
 \includegraphics[width=\textwidth]{pilot_traces.png}
 \caption{Straight axis. Left: off-axis force, with the 30~N limit dashed. Right: opening, with
 the target dashed.}\label{fig:traces}
+\end{figure}
+
+\Cref{fig:clips} shows the two outcomes in simulation. Clips of both runs are in the repository.
+
+\begin{figure}[ht]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{baseline_success.png}
+  \caption{$0^\circ$: target reached.}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{baseline_failure.png}
+  \caption{$2^\circ$: handle loss at 0.11~m.}
+\end{subfigure}
+\caption{Final scene of a successful and a failed baseline trial.}\label{fig:clips}
 \end{figure}
 
 \subsection{Interpretation}

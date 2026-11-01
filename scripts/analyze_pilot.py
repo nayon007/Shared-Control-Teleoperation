@@ -53,6 +53,7 @@ def table(trials):
             h, sum(t['status'] == 'success' for t in g), len(g), ' & '.join(cells),
             max(t['peak_F_perp_N'] for t in g)))
     with open(os.path.join(ROOT, 'pilot_table.tex'), 'w') as f:
+        f.write('% Table rows only: this fragment is \\input by phase3_report.tex and does not compile alone.\n')
         f.write('\n'.join(tex) + '\n')
     return rows
 
