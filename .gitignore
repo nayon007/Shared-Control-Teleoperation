@@ -29,6 +29,8 @@ docs/phase3_report/*.aux
 docs/phase3_report/*.log
 docs/phase3_report/*.out
 
+results/phase3/video/frames_h*/
+
 # Editors / OS
 .vscode/
 .idea/

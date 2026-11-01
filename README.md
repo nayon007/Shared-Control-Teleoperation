@@ -10,6 +10,7 @@ trigger reports opening resistance.
 
 - **Design document (paper):** [LaTeX_Literature_Review/main.tex](LaTeX_Literature_Review/main.tex)
 - **Phase 3 report:** [docs/phase3_report/phase3_report.pdf](docs/phase3_report/phase3_report.pdf) (scenario, baseline, pilot experiments). The folder is a self-contained LaTeX project: run `pdflatex phase3_report.tex` twice there, or upload `docs/phase3_report_overleaf.zip` to Overleaf. `scripts/update_report_figures.sh` refreshes its figures from `results/`.
+- **Summary video (57 s):** [docs/phase3_video.mp4](docs/phase3_video.mp4). Rebuild with `python3 scripts/make_video.py` from frames saved by `scripts/record_frames.py`.
 - **Stack:** ROS 2 Humble and Gazebo Classic 11 in **Docker**, on an Ubuntu 20.04 host with an RTX 4090. The same image is used later on the real FR3.
 
 | Drawer, axis towards the robot | Drawer, axis tilted 0.4 rad | Door, r = 0.6 m |
@@ -688,6 +689,7 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
   - Wrote the Phase 3 report (`docs/phase3_report/`), edited with the avoid-ai-writing rules.
   - Gazebo replaces PyBullet for the course phases (agreed).
   - Report rewritten as an anonymous third-person research report.
+  - Added a 57 s summary video: one recorded success and one failure with a live force gauge, the pilot plot and the main result.
   - Report made self-contained (figures, table) with Gazebo screenshots, scene variants, validation plots and trial outcomes.
 
 - **2026-10-28: Step 3 done: welded grasp and handle wrench.**
