@@ -687,6 +687,7 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
   - Ran 48 pilot trials (`run_pilot.sh`, `analyze_pilot.py`, `results/phase3/`).
   - Wrote the Phase 3 report (`docs/phase3_report/`), edited with the avoid-ai-writing rules.
   - Gazebo replaces PyBullet for the course phases (agreed).
+  - Report rewritten as an anonymous third-person research report.
   - Report made self-contained (figures, table) with Gazebo screenshots, scene variants, validation plots and trial outcomes.
 
 - **2026-10-28: Step 3 done: welded grasp and handle wrench.**
