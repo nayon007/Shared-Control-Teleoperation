@@ -74,8 +74,10 @@ def gauge(im, force, opening, limit_hit):
     d.text((x, y + h + 8), '%4.1f N  of 30 N limit' % force, font=font(21), fill=(255, 255, 255))
     d.text((x + 262, y + h + 8), 'opening %.3f m' % opening, font=font(18), fill=(205, 212, 220))
     if limit_hit:
-        d.rectangle((W // 2 - 190, 34, W // 2 + 190, 96), fill=(200, 40, 35, 235))
-        centered(d, 46, 'HANDLE LOST', font(32, True))
+        d.rectangle((W - 400, 34, W - 30, 96), fill=(200, 40, 35, 235))
+        t = 'HANDLE LOST'
+        d.text((W - 215 - d.textlength(t, font=font(32, True)) / 2, 46), t,
+               font=font(32, True), fill=(255, 255, 255))
     return im
 
 
