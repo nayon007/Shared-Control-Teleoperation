@@ -6,7 +6,7 @@ This README covers installation, launch, controls and reset. The baseline is dir
 
 **Requirements:** Linux with an X11 desktop and Docker. An NVIDIA GPU is expected by the default setup. ROS 2 Humble and Gazebo 11 run inside the container, so they need no host installation. The commands were tested on Ubuntu 20.04.
 
-Commands marked `host$` run in a normal terminal, with `<project>` standing for the folder containing this file. Commands marked `container$` run inside the Docker container.
+Each code block says where to run it: `# --- on the host ---` means a normal terminal, and `# --- inside the container ---` means a shell opened with `docker compose exec dev bash`. Lines starting with `#` are only labels, so pasting them does nothing. `<project>` stands for the folder containing this file.
 
 ## 1. Installation
 
@@ -15,34 +15,40 @@ Do this once.
 **1. Install Docker, the NVIDIA Container Toolkit and the DualSense device rule** (asks for your sudo password):
 
 ```bash
-host$ cd <project>
-host$ bash scripts/setup_host_docker.sh
+# --- on the host (normal terminal) ---
+cd <project>
+bash scripts/setup_host_docker.sh
 ```
 
 Log out and back in, then check that Docker can see the GPU:
 
 ```bash
-host$ docker run --rm --gpus all ubuntu:22.04 nvidia-smi
+# --- on the host (normal terminal) ---
+docker run --rm --gpus all ubuntu:22.04 nvidia-smi
 ```
 
 **2. Make sure the FR3 robot model is present.** `ros2_ws/src/franka_description` must contain files. If it's empty, get it at the pinned version:
 
 ```bash
-host$ git clone --depth 1 --branch 2.9.0 https://github.com/frankaemika/franka_description.git ros2_ws/src/franka_description
+# --- on the host (normal terminal) ---
+git clone --depth 1 --branch 2.9.0 https://github.com/frankaemika/franka_description.git ros2_ws/src/franka_description
 ```
 
 **3. Build the container image.** This downloads about 4 GB.
 
 ```bash
-host$ docker compose build
+# --- on the host (normal terminal) ---
+docker compose build
 ```
 
 **4. Start the container and build the workspace:**
 
 ```bash
-host$ docker compose up -d
-host$ docker compose exec dev bash
-container$ cd ~/SCE_571_ws/ros2_ws && colcon build --symlink-install
+# --- on the host (normal terminal) ---
+docker compose up -d
+docker compose exec dev bash
+# --- inside the container ---
+cd ~/SCE_571_ws/ros2_ws && colcon build --symlink-install
 ```
 
 The summary should end with `4 packages finished`. The project folder is shared with the container, so `~/SCE_571_ws` inside the container is your `<project>` folder.
@@ -52,12 +58,14 @@ The summary should end with `4 packages finished`. The project folder is shared 
 Do this at the start of each session.
 
 ```bash
-host$ cd <project>
-host$ xhost +local:docker            # lets the container open the Gazebo window
-host$ docker compose up -d
-host$ docker compose exec dev bash
-container$ source ~/SCE_571_ws/ros2_ws/install/setup.bash
-container$ ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
+# --- on the host (normal terminal) ---
+cd <project>
+xhost +local:docker            # lets the container open the Gazebo window
+docker compose up -d
+docker compose exec dev bash
+# --- inside the container ---
+source ~/SCE_571_ws/ros2_ws/install/setup.bash
+ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
 ```
 
 The Gazebo window opens with the gripper on the drawer handle. Wait until the terminal prints:
@@ -69,8 +77,10 @@ The Gazebo window opens with the gripper on the drawer handle. Wait until the te
 This took about 8 s in testing; the very first start can take longer. Leave this terminal running and open a second one for the trial (Section 3):
 
 ```bash
-host$ docker compose exec dev bash
-container$ source ~/SCE_571_ws/ros2_ws/install/setup.bash
+# --- on the host (normal terminal) ---
+docker compose exec dev bash
+# --- inside the container ---
+source ~/SCE_571_ws/ros2_ws/install/setup.bash
 ```
 
 `ideal_gravity_comp:=true` is needed for valid trials. Without it, gravity effects on the arm's joint controller alone can exceed the 30 N limit.
@@ -94,8 +104,9 @@ Each run below is one trial. Reset (Section 4) before starting the next one.
 The script pushes at 0.1 m/s along the drawer axis, rotated by a fixed heading error.
 
 ```bash
-container$ ros2 run sc_gazebo baseline_direct.py --heading 0     # should succeed
-container$ ros2 run sc_gazebo baseline_direct.py --heading 2     # should lose the handle
+# --- inside the container ---
+ros2 run sc_gazebo baseline_direct.py --heading 0     # should succeed
+ros2 run sc_gazebo baseline_direct.py --heading 2     # should lose the handle
 ```
 
 To save the results, add `--out trial.json --log trial.csv`.
@@ -105,8 +116,9 @@ To save the results, add `--out trial.json --log trial.csv`.
 Connect the controller by USB. In one container terminal start the controller driver, and in another start the trial:
 
 ```bash
-container$ ros2 run joy joy_node
-container$ ros2 run sc_gazebo baseline_direct.py --joy --timeout 60
+# --- inside the container ---
+ros2 run joy joy_node
+ros2 run sc_gazebo baseline_direct.py --joy --timeout 60
 ```
 
 | Control | Action |
@@ -121,7 +133,8 @@ With the default scene, **hold the left stick left and squeeze R2** to open the 
 The controller path has been tested only with simulated stick messages, not on a physical DualSense. To try it without a controller, run this instead of `joy_node`:
 
 ```bash
-container$ python3 ~/SCE_571_ws/scripts/fake_joy.py --lx 1 --r2 -1 --seconds 10
+# --- inside the container ---
+python3 ~/SCE_571_ws/scripts/fake_joy.py --lx 1 --r2 -1 --seconds 10
 ```
 
 The stick axis numbers assume a Linux DualSense through `joy_node`. If a real controller moves the wrong way, check them with `ros2 topic echo /joy`.
@@ -151,19 +164,22 @@ Reset before every trial. It stops the simulation and starts it again with the d
 In a container terminal, stop the simulation:
 
 ```bash
-container$ bash ~/SCE_571_ws/scripts/stop_sim.sh
+# --- inside the container ---
+bash ~/SCE_571_ws/scripts/stop_sim.sh
 ```
 
 Then run the launch command again and wait for `simulation ready`:
 
 ```bash
-container$ ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
+# --- inside the container ---
+ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
 ```
 
 Or do both steps from the host, without the Gazebo window:
 
 ```bash
-host$ bash scripts/run_sim_bg.sh gui:=false ideal_gravity_comp:=true
+# --- on the host (normal terminal) ---
+bash scripts/run_sim_bg.sh gui:=false ideal_gravity_comp:=true
 ```
 
 Always stop the old simulation first. Leftover processes can make the next launch fail or load the wrong scene.
@@ -171,8 +187,10 @@ Always stop the old simulation first. Leftover processes can make the next launc
 To finish a session:
 
 ```bash
-container$ bash ~/SCE_571_ws/scripts/stop_sim.sh
-host$ docker compose down
+# --- inside the container ---
+bash ~/SCE_571_ws/scripts/stop_sim.sh
+# --- on the host (normal terminal) ---
+docker compose down
 ```
 
 ## 5. Repeat the experiments
@@ -180,8 +198,9 @@ host$ docker compose down
 To rerun all 48 trials (about 20 minutes, with the container running):
 
 ```bash
-host$ bash scripts/run_pilot.sh
-host$ python3 scripts/analyze_pilot.py
+# --- on the host (normal terminal) ---
+bash scripts/run_pilot.sh
+python3 scripts/analyze_pilot.py
 ```
 
 Results go to `results/phase3/`. Trials already saved in `results/phase3/trials/` are skipped, so move that folder away to run everything again. `analyze_pilot.py` needs numpy and matplotlib on the host.

@@ -44,39 +44,42 @@ The operator and the shared-control loop arrive in steps 4–5.
 
 ## 1. Run the simulation (step by step)
 
-Commands prefixed with **host$** run in a normal terminal on the laptop.
-Commands prefixed with **container$** run inside the Docker container. Never
+In each code block, `# --- on the host ---` marks commands for a normal terminal
+and `# --- inside the container ---` marks commands for the Docker container. Never
 source ROS 2 on the host, and never source ROS 1 Noetic in the container.
 
 ### 1.1 One-time setup (already done on this laptop)
 
 ```bash
-host$ git clone --recurse-submodules https://github.com/nayon007/Shared-Control-Teleoperation.git ~/SCE_571_ws
-host$ bash ~/SCE_571_ws/scripts/setup_host_docker.sh   # Docker, NVIDIA toolkit, DualSense udev rule (sudo)
+# --- on the host (normal terminal) ---
+git clone --recurse-submodules https://github.com/nayon007/Shared-Control-Teleoperation.git ~/SCE_571_ws
+bash ~/SCE_571_ws/scripts/setup_host_docker.sh   # Docker, NVIDIA toolkit, DualSense udev rule (sudo)
 # log out and back in (docker group), then check the GPU inside Docker:
-host$ docker run --rm --gpus all ubuntu:22.04 nvidia-smi
-host$ cd ~/SCE_571_ws && docker compose build          # builds sce571/humble-dev (~3.9 GB, slow on a slow network)
+docker run --rm --gpus all ubuntu:22.04 nvidia-smi
+cd ~/SCE_571_ws && docker compose build          # builds sce571/humble-dev (~3.9 GB, slow on a slow network)
 ```
 
 ### 1.2 Every session
 
 ```bash
 # 1. allow the container to open windows (once per login)
-host$ xhost +local:docker
+# --- on the host (normal terminal) ---
+xhost +local:docker
 
 # 2. start the container (it keeps running in the background)
-host$ cd ~/SCE_571_ws && docker compose up -d
+cd ~/SCE_571_ws && docker compose up -d
 
 # 3. open a shell inside it (repeat in more terminals if needed; ROS is pre-sourced)
-host$ docker compose exec dev bash
+docker compose exec dev bash
 
 # 4. build the workspace (first time, or after changing code)
-container$ cd ~/SCE_571_ws/ros2_ws && colcon build --symlink-install && source install/setup.bash
+# --- inside the container ---
+cd ~/SCE_571_ws/ros2_ws && colcon build --symlink-install && source install/setup.bash
 
 # 5. launch the simulation: FR3 with its gripper welded to the handle (step 3)
-container$ ros2 launch sc_gazebo sim.launch.py                       # drawer, axis towards the robot
-container$ ros2 launch sc_gazebo sim.launch.py yaw:=2.74             # drawer with a tilted axis
-container$ ros2 launch sc_gazebo sim.launch.py kind:=door radius:=0.6  # door
+ros2 launch sc_gazebo sim.launch.py                       # drawer, axis towards the robot
+ros2 launch sc_gazebo sim.launch.py yaw:=2.74             # drawer with a tilted axis
+ros2 launch sc_gazebo sim.launch.py kind:=door radius:=0.6  # door
 ```
 
 The terminal prints the computed start pose. After about 20 s it shows
@@ -87,16 +90,18 @@ attached to the handle.
 To try the system, run in a second terminal:
 
 ```bash
-container$ ros2 run sc_gazebo weld_check.py --demo      # the arm opens and closes the mechanism
-container$ ros2 run sc_gazebo weld_check.py             # full step 3 validation (§7.3)
+# --- inside the container ---
+ros2 run sc_gazebo weld_check.py --demo      # the arm opens and closes the mechanism
+ros2 run sc_gazebo weld_check.py             # full step 3 validation (§7.3)
 ```
 
 **Phase 3 scenario and baseline.** Use this launch for trials (see §7.4):
 
 ```bash
-container$ ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
-container$ ros2 run sc_gazebo baseline_direct.py --heading 2   # scripted operator, 2 deg heading error
-container$ ros2 run sc_gazebo baseline_direct.py --joy         # DualSense; needs `ros2 run joy joy_node`
+# --- inside the container ---
+ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
+ros2 run sc_gazebo baseline_direct.py --heading 2   # scripted operator, 2 deg heading error
+ros2 run sc_gazebo baseline_direct.py --joy         # DualSense; needs `ros2 run joy joy_node`
 ```
 
 **Controls (`--joy`, tested with simulated stick messages only, `scripts/fake_joy.py`):** left stick moves the hand in the base x/y plane (right = +x, up = +y), right stick up moves +z, and R2 sets the speed and acts as the deadman (released or untouched = no motion). Maximum speed is 0.1 m/s. The same success and failure criteria apply. Full steps for this scenario are in [README_PHASE3.md](README_PHASE3.md).
@@ -104,8 +109,10 @@ container$ ros2 run sc_gazebo baseline_direct.py --joy         # DualSense; need
 **Reset:** stop and relaunch, about 11 s. Every trial starts from this state.
 
 ```bash
-container$ bash ~/SCE_571_ws/scripts/stop_sim.sh      # then run the launch command again
-host$      bash ~/SCE_571_ws/scripts/run_sim_bg.sh gui:=false ideal_gravity_comp:=true   # same, from the host
+# --- inside the container ---
+bash ~/SCE_571_ws/scripts/stop_sim.sh      # then run the launch command again
+# --- on the host (normal terminal) ---
+bash ~/SCE_571_ws/scripts/run_sim_bg.sh gui:=false ideal_gravity_comp:=true   # same, from the host
 ```
 
 **Launch arguments of `sim.launch.py`:**
@@ -131,33 +138,37 @@ without the weld, with the arm in the Franka "ready" pose. It also accepts
 ### 1.3 Useful checks (second container terminal)
 
 ```bash
-container$ ros2 control list_controllers              # joint_state_broadcaster, gripper_controller, arm_hold_controller
-container$ ros2 topic echo /sc_weld/handle_wrench      # F (and torque) of the robot on the handle, world frame, 500 Hz
-container$ ros2 topic echo /sc_weld/attached           # true while welded
-container$ ros2 service call /sc_weld/detach std_srvs/srv/Trigger   # let go of the handle (attach: /sc_weld/attach)
-container$ ros2 topic echo /mechanism/joint_states    # ground-truth q of the drawer/door (logger only!)
-container$ ros2 topic echo /joint_states              # FR3 joints
-container$ ros2 run rqt_image_view rqt_image_view /scene_camera/image_raw   # operator view
+# --- inside the container ---
+ros2 control list_controllers              # joint_state_broadcaster, gripper_controller, arm_hold_controller
+ros2 topic echo /sc_weld/handle_wrench      # F (and torque) of the robot on the handle, world frame, 500 Hz
+ros2 topic echo /sc_weld/attached           # true while welded
+ros2 service call /sc_weld/detach std_srvs/srv/Trigger   # let go of the handle (attach: /sc_weld/attach)
+ros2 topic echo /mechanism/joint_states    # ground-truth q of the drawer/door (logger only!)
+ros2 topic echo /joint_states              # FR3 joints
+ros2 run rqt_image_view rqt_image_view /scene_camera/image_raw   # operator view
 
 # push the mechanism with 10 N, then remove the push again (efforts add up, see §9);
 # while welded, /sc_weld/handle_wrench shows the arm resisting the push
-container$ ros2 service call /apply_joint_effort gazebo_msgs/srv/ApplyJointEffort \
+ros2 service call /apply_joint_effort gazebo_msgs/srv/ApplyJointEffort \
              "{joint_name: mechanism::mech_joint, effort: 10.0, duration: {sec: -1}}"
-container$ ros2 service call /apply_joint_effort gazebo_msgs/srv/ApplyJointEffort \
+ros2 service call /apply_joint_effort gazebo_msgs/srv/ApplyJointEffort \
              "{joint_name: mechanism::mech_joint, effort: -10.0, duration: {sec: -1}}"
 ```
 
 **Models only, in RViz (no physics):** drag the sliders to move the arm and the drawer or door.
 
 ```bash
-container$ ros2 launch sc_description view.launch.py              # or kind:=door
+# --- inside the container ---
+ros2 launch sc_description view.launch.py              # or kind:=door
 ```
 
 ### 1.4 Stop
 
 ```bash
-container$ bash ~/SCE_571_ws/scripts/stop_sim.sh    # or Ctrl-C in the launch terminal
-host$ docker compose down                           # stop the container (files stay on the host)
+# --- inside the container ---
+bash ~/SCE_571_ws/scripts/stop_sim.sh    # or Ctrl-C in the launch terminal
+# --- on the host (normal terminal) ---
+docker compose down                           # stop the container (files stay on the host)
 ```
 
 Always stop the old simulation before you launch a new one. Leftover
@@ -167,21 +178,26 @@ processes publish a stale robot model that the next launch would spawn
 ### 1.5 Tests
 
 ```bash
-container$ cd ~/SCE_571_ws/ros2_ws && colcon test --packages-select sc_core sc_description sc_gazebo && colcon test-result --verbose
-container$ bash ~/SCE_571_ws/scripts/smoke_gazebo.sh [kind:=door]   # step 2 scene, headless check
-host$      bash ~/SCE_571_ws/scripts/run_sim_bg.sh gui:=false       # step 3 sim headless, waits for /sim_ready
-container$ ros2 run sc_gazebo weld_check.py --seconds 10            # then the step 3 validation
-container$ ros2 run sc_gazebo reachability.py --markdown            # workspace table of §7.3 (~25 min)
-host$      cd ~/SCE_571_ws/ros2_ws/src/sc_core && python3 -m unittest discover -s test   # core only, no ROS
+# --- inside the container ---
+cd ~/SCE_571_ws/ros2_ws && colcon test --packages-select sc_core sc_description sc_gazebo && colcon test-result --verbose
+bash ~/SCE_571_ws/scripts/smoke_gazebo.sh [kind:=door]   # step 2 scene, headless check
+# --- on the host (normal terminal) ---
+bash ~/SCE_571_ws/scripts/run_sim_bg.sh gui:=false       # step 3 sim headless, waits for /sim_ready
+# --- inside the container ---
+ros2 run sc_gazebo weld_check.py --seconds 10            # then the step 3 validation
+ros2 run sc_gazebo reachability.py --markdown            # workspace table of §7.3 (~25 min)
+# --- on the host (normal terminal) ---
+cd ~/SCE_571_ws/ros2_ws/src/sc_core && python3 -m unittest discover -s test   # core only, no ROS
 ```
 
 ### 1.6 Regenerate the images and GIFs in this README
 
 ```bash
-host$ bash ~/SCE_571_ws/scripts/run_pilot.sh        # all 48 pilot trials (~20 min, resumes; container up)
-host$ python3 ~/SCE_571_ws/scripts/analyze_pilot.py # tables and plots from the trial files
-host$ bash ~/SCE_571_ws/scripts/capture_step3.sh    # step 3 GIFs and images (container must be up)
-host$ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # step 2 images and GIFs
+# --- on the host (normal terminal) ---
+bash ~/SCE_571_ws/scripts/run_pilot.sh        # all 48 pilot trials (~20 min, resumes; container up)
+python3 ~/SCE_571_ws/scripts/analyze_pilot.py # tables and plots from the trial files
+bash ~/SCE_571_ws/scripts/capture_step3.sh    # step 3 GIFs and images (container must be up)
+bash ~/SCE_571_ws/scripts/capture_scenes.sh   # step 2 images and GIFs
 ```
 
 ---
@@ -690,6 +706,7 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
   - Gazebo replaces PyBullet for the course phases (agreed).
   - Report rewritten as an anonymous third-person research report.
   - Added `README_PHASE3.md` (installation, launch, controls, reset), with its commands tested.
+  - Removed the `host$` / `container$` prefixes from commands, which broke copy-paste; a comment line now marks where to run each block.
   - Fixed the `--joy` mode: stick signs, an untouched R2 no longer counts as half throttle, and trials now end by the same criteria. Added `scripts/fake_joy.py`.
   - Added a 57 s summary video: one recorded success and one failure with a live force gauge, the pilot plot and the main result.
   - Report made self-contained (figures, table) with Gazebo screenshots, scene variants, validation plots and trial outcomes.
