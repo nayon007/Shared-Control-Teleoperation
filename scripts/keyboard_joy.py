@@ -33,13 +33,14 @@ def clamp(v):
     return max(-1.0, min(1.0, v))
 
 
-def status(lx, ly, ry, r2_on, level):
+def status(lx, ly, ry, r2_on, level, listening):
     trig = 'R2 ON  %3d %%' % round(level * 100) if r2_on else 'R2 off (robot holds still)'
     bar = lambda v: '[' + ''.join('#' if abs(v) * 4 >= i else '.' for i in range(1, 5)) + ']'  # noqa: E731
     left = ('left ' if lx > 0 else 'right' if lx < 0 else '     ') + bar(lx)
     up = ('up  ' if ly > 0 else 'down' if ly < 0 else '    ') + bar(ly)
     z = ('up  ' if ry > 0 else 'down' if ry < 0 else '    ') + bar(ry)
-    return '\r  L-stick %s %s | R-stick %s | %s   ' % (left, up, z, trig)
+    trial = 'trial listening' if listening else 'NO TRIAL LISTENING - start baseline_direct.py --joy'
+    return '\r  L %s %s | R %s | %s | %s   ' % (left, up, z, trig, trial)
 
 
 def main():
@@ -87,7 +88,7 @@ def main():
             if r2 == 0.0:
                 r2 = -0.001
             pub.publish(Joy(axes=[lx, ly, 0.0, 0.0, ry, r2], buttons=[0] * 13))
-            sys.stdout.write(status(lx, ly, ry, r2_on, level))
+            sys.stdout.write(status(lx, ly, ry, r2_on, level, pub.get_subscription_count() > 0))
             sys.stdout.flush()
     except KeyboardInterrupt:
         pass

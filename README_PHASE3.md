@@ -143,6 +143,11 @@ Watch the Gazebo window while you press keys in Terminal 3:
 
 Each press moves a stick a quarter of the way, and it **stays there** until you change it, because a terminal can't detect when a key is released. Terminal 3 shows the current stick and R2 state on one line.
 
+**Check that it's connected before driving:**
+- Terminal 2 must show `READY: steer now`. Until then it prints `waiting for the simulation`.
+- Terminal 3's status line must end with `trial listening`. If it shows `NO TRIAL LISTENING`, Terminal 2 isn't running or its trial has already ended.
+- While you drive, Terminal 2 prints a line every second with the opening, the sideways force and the input. `input none (no /joy messages)` means the keyboard isn't reaching it.
+
 **To open the drawer:** press `a` four times (stick fully left), then `space`. The drawer opens, and Terminal 2 prints `"status": "success"` once it reaches 0.25 m. Press `space` at any time to stop the robot.
 
 **To see the problem the project studies:** after `a a a a`, also press `w` once, so the push is slightly sideways. The handle is lost within a few centimetres.
@@ -191,7 +196,8 @@ If a real controller moves the wrong way, check the stick values with `ros2 topi
 |---|---|
 | `Command 'host$' not found` (or similar) | Copy only the command, not any label in front of it |
 | No Gazebo window appears | Run `xhost +local:docker` on the computer (not in the container), then launch again |
-| `ros2: command not found` | You're not inside the container, or you skipped `source ~/SCE_571_ws/ros2_ws/install/setup.bash` |
+| `ros2: command not found`, or `No module named rclpy` | You're not inside the container, or you skipped `source ~/SCE_571_ws/ros2_ws/install/setup.bash` |
+| Keys do nothing | Click on Terminal 3 first, so it receives the keys; check that its line says `trial listening` and that R2 is ON |
 | The trial command waits and nothing happens | The simulation isn't ready yet: wait for `simulation ready` in Terminal 1 |
 | `ros2` commands fail with `!rclpy.ok()` | Run `ros2 daemon stop`, then try again |
 | A spawn timeout, or the wrong scene appears | Run `bash ~/SCE_571_ws/scripts/stop_sim.sh`, then launch again |

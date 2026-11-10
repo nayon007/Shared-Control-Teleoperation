@@ -113,6 +113,8 @@ def main():
 
     rclpy.init()
     n = Direct()
+    print('waiting for the simulation (launch sim.launch.py and wait for "simulation ready")',
+          flush=True)
     while not (n.ready and all(v is not None for v in (n.robot_xml, n.mech_xml, n.q, n.q_mech, n.F))):
         rclpy.spin_once(n, timeout_sec=0.1)
 
@@ -139,7 +141,16 @@ def main():
         n.command(q_cmd)
         rclpy.spin_once(n, timeout_sec=0.02)
     q0 = n.q_mech
+    if q0 > 0.005:
+        print('warning: the drawer is already %.3f m open; reset the simulation for a valid trial'
+              % q0, flush=True)
+    if args.joy:
+        print('READY: steer now (joystick or keyboard_joy.py). Time limit %.0f s.' % args.timeout,
+              flush=True)
+    else:
+        print('trial started: heading error %g deg' % args.heading, flush=True)
     log = {k: [] for k in ('t', 'opening', 'F_perp_true', 'F_par')}
+    next_report = 1.0
     t_start, last = None, None
     status = 'timeout'
 
@@ -174,6 +185,12 @@ def main():
         log['F_perp_true'].append(F_perp)
         log['F_par'].append(F_par)
 
+        if args.joy and elapsed >= next_report:
+            next_report += 1.0
+            print('  t %5.1f s   opening %.3f m   sideways force %5.1f N   input %s'
+                  % (elapsed, opening, np.linalg.norm(F_perp),
+                     'none (no /joy messages)' if n.joy is None else
+                     'speed %.2f m/s' % np.linalg.norm(u)), flush=True)
         if np.linalg.norm(F_perp) > args.slip_force:
             status = 'handle_lost'
             break
