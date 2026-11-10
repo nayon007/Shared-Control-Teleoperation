@@ -705,6 +705,7 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
   - Wrote the Phase 3 report (`docs/phase3_report/`), edited with the avoid-ai-writing rules.
   - Gazebo replaces PyBullet for the course phases (agreed).
   - Report rewritten as an anonymous third-person research report.
+  - Report rewritten again for readability: new "The controller" section (operator command, target point, damped-least-squares IK, joint PID with gains, gravity compensation, effective stiffness) with a control-loop diagram, a "Sensing" section including the joint-torque force estimate, and a corrected note on the force reading (the extra force is most likely real).
   - Added `README_PHASE3.md` (installation, launch, controls, reset), with its commands tested.
   - Added `scripts/keyboard_joy.py`: drive the robot from the keyboard, publishing `/joy` like a DualSense.
   - Removed the `host$` / `container$` prefixes from commands, which broke copy-paste; a comment line now marks where to run each block.
