@@ -706,6 +706,7 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
   - Gazebo replaces PyBullet for the course phases (agreed).
   - Report rewritten as an anonymous third-person research report.
   - Added `README_PHASE3.md` (installation, launch, controls, reset), with its commands tested.
+  - Added `scripts/keyboard_joy.py`: drive the robot from the keyboard, publishing `/joy` like a DualSense.
   - Removed the `host$` / `container$` prefixes from commands, which broke copy-paste; a comment line now marks where to run each block.
   - Fixed the `--joy` mode: stick signs, an untouched R2 no longer counts as half throttle, and trials now end by the same criteria. Added `scripts/fake_joy.py`.
   - Added a 57 s summary video: one recorded success and one failure with a live force gauge, the pilot plot and the main result.

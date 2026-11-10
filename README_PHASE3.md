@@ -110,6 +110,47 @@ The heading is how far, in degrees, the robot's push points away from the drawer
 
 ---
 
+## Drive it yourself with the keyboard (no controller needed)
+
+You need **three terminals**, all inside the container. Open each with `cd ~/SCE_571_ws`, `docker compose exec dev bash`, then `source ~/SCE_571_ws/ros2_ws/install/setup.bash`.
+
+```bash
+# --- Terminal 1: the simulation (wait for "simulation ready") ---
+ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
+```
+
+```bash
+# --- Terminal 2: the trial, listening for controller input for up to 2 minutes ---
+ros2 run sc_gazebo baseline_direct.py --joy --timeout 120
+```
+
+```bash
+# --- Terminal 3: the keyboard controller (keep this terminal selected while driving) ---
+python3 ~/SCE_571_ws/scripts/keyboard_joy.py
+```
+
+Watch the Gazebo window while you press keys in Terminal 3:
+
+| Key | Does |
+|---|---|
+| `a` / `d` | Left stick left / right: move the hand along -x / +x |
+| `w` / `s` | Left stick up / down: move the hand along +y / -y |
+| `i` / `k` | Right stick up / down: move the hand up / down |
+| `space` | R2 on / off. **Off = the robot stays still** |
+| `1` … `9`, `0` | Speed with R2 on: 10 % … 90 %, `0` = 100 % (0.1 m/s) |
+| `x` | Centre both sticks |
+| `q` | Quit (releases R2 first) |
+
+Each press moves a stick a quarter of the way, and it **stays there** until you change it, because a terminal can't detect when a key is released. Terminal 3 shows the current stick and R2 state on one line.
+
+**To open the drawer:** press `a` four times (stick fully left), then `space`. The drawer opens, and Terminal 2 prints `"status": "success"` once it reaches 0.25 m. Press `space` at any time to stop the robot.
+
+**To see the problem the project studies:** after `a a a a`, also press `w` once, so the push is slightly sideways. The handle is lost within a few centimetres.
+
+The keyboard controller sends exactly the same `/joy` messages as a DualSense through `joy_node`, so the trial program can't tell them apart. In testing, `a a a a space` opened the drawer in 3 of 3 runs. One earlier run ended with `ik_failed` and could not be reproduced. After every trial, reset as in the Quick start, then start Terminal 2 again.
+
+---
+
 ## Controls (DualSense controller)
 
 Connect the controller by USB. Keep the simulation running in Terminal 1, and open two more terminals inside the container (`cd ~/SCE_571_ws` then `docker compose exec dev bash`, then `source ~/SCE_571_ws/ros2_ws/install/setup.bash`):
@@ -133,7 +174,7 @@ ros2 run sc_gazebo baseline_direct.py --joy --timeout 60
 
 **To open the drawer: hold the left stick to the left and squeeze R2.**
 
-The controller mode has been tested only with simulated stick input, not with a physical controller. To try it without a controller, run this in Terminal 2 instead of `joy_node`:
+The controller mode has been tested only with simulated input (the keyboard controller above, and `fake_joy.py`), not with a physical DualSense. `fake_joy.py` holds one fixed input instead of letting you steer; run it in Terminal 2 instead of `joy_node`:
 
 ```bash
 # --- Terminal 2, inside the container ---
