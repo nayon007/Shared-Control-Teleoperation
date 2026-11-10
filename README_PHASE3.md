@@ -1,218 +1,216 @@
 # Drawer-Opening Scenario in Gazebo
 
-A simulated Franka Research 3 (FR3) holds the handle of a drawer and must open it by 0.25 m. Any motion off the drawer axis turns into force at the handle. If that off-axis force exceeds 30 N, the handle counts as lost and the trial fails.
+A simulated Franka Research 3 (FR3) robot holds a drawer handle and must pull the drawer open by 0.25 m. If the robot pushes sideways, the drawer resists. Once that sideways force passes 30 N, the trial counts as failed ("handle lost").
 
-This README covers installation, launch, controls and reset. The baseline is direct teleoperation, run by a scripted operator or a DualSense controller.
+The project folder is `~/SCE_571_ws`. ROS 2 and Gazebo run inside a Docker container, so they are not installed on the computer itself.
 
-**Requirements:** Linux with an X11 desktop and Docker. An NVIDIA GPU is expected by the default setup. ROS 2 Humble and Gazebo 11 run inside the container, so they need no host installation. The commands were tested on Ubuntu 20.04.
+---
 
-Each code block says where to run it: `# --- on the host ---` means a normal terminal, and `# --- inside the container ---` means a shell opened with `docker compose exec dev bash`. Lines starting with `#` are only labels, so pasting them does nothing. `<project>` stands for the folder containing this file.
+## Quick start (every time)
 
-## 1. Installation
+You need **two terminals**. Code blocks below are marked with the terminal to use; lines starting with `#` are only labels, so pasting them does nothing.
 
-Do this once.
+### Terminal 1: start the simulation
 
-**1. Install Docker, the NVIDIA Container Toolkit and the DualSense device rule** (asks for your sudo password):
-
-```bash
-# --- on the host (normal terminal) ---
-cd <project>
-bash scripts/setup_host_docker.sh
-```
-
-Log out and back in, then check that Docker can see the GPU:
+Open a normal terminal and run:
 
 ```bash
-# --- on the host (normal terminal) ---
-docker run --rm --gpus all ubuntu:22.04 nvidia-smi
-```
-
-**2. Make sure the FR3 robot model is present.** `ros2_ws/src/franka_description` must contain files. If it's empty, get it at the pinned version:
-
-```bash
-# --- on the host (normal terminal) ---
-git clone --depth 1 --branch 2.9.0 https://github.com/frankaemika/franka_description.git ros2_ws/src/franka_description
-```
-
-**3. Build the container image.** This downloads about 4 GB.
-
-```bash
-# --- on the host (normal terminal) ---
-docker compose build
-```
-
-**4. Start the container and build the workspace:**
-
-```bash
-# --- on the host (normal terminal) ---
+# --- Terminal 1, on the computer ---
+xhost +local:docker
+cd ~/SCE_571_ws
 docker compose up -d
 docker compose exec dev bash
-# --- inside the container ---
-cd ~/SCE_571_ws/ros2_ws && colcon build --symlink-install
 ```
 
-The summary should end with `4 packages finished`. The project folder is shared with the container, so `~/SCE_571_ws` inside the container is your `<project>` folder.
-
-## 2. Launch
-
-Do this at the start of each session.
+The prompt changes to `dev@...`, which means you're now **inside the container**. Continue there:
 
 ```bash
-# --- on the host (normal terminal) ---
-cd <project>
-xhost +local:docker            # lets the container open the Gazebo window
-docker compose up -d
-docker compose exec dev bash
-# --- inside the container ---
+# --- Terminal 1, inside the container ---
 source ~/SCE_571_ws/ros2_ws/install/setup.bash
 ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
 ```
 
-The Gazebo window opens with the gripper on the drawer handle. Wait until the terminal prints:
+The Gazebo window opens with the robot holding the drawer handle. **Wait for this line** (about 10 s):
 
 ```
 [sim_startup]: simulation ready
 ```
 
-This took about 8 s in testing; the very first start can take longer. Leave this terminal running and open a second one for the trial (Section 3):
+Leave Terminal 1 running.
+
+### Terminal 2: run a trial
+
+Open a second normal terminal:
 
 ```bash
-# --- on the host (normal terminal) ---
+# --- Terminal 2, on the computer ---
+cd ~/SCE_571_ws
 docker compose exec dev bash
-# --- inside the container ---
+```
+
+```bash
+# --- Terminal 2, inside the container ---
 source ~/SCE_571_ws/ros2_ws/install/setup.bash
+ros2 run sc_gazebo baseline_direct.py --heading 0
 ```
 
-`ideal_gravity_comp:=true` is needed for valid trials. Without it, gravity effects on the arm's joint controller alone can exceed the 30 N limit.
+In Gazebo the robot pulls the drawer open. Terminal 2 then prints one line of results, which should contain `"status": "success"`.
 
-**Useful launch options:**
+### Before the next trial: reset
 
-| Option | Default | Meaning |
-|---|---|---|
-| `yaw:=2.74159` | `3.14159` | Drawer axis direction in radians. 3.14159 points at the robot; the trials also used 2.74159 and 3.54159 |
-| `friction:=3.0` | `3.0` | Drawer friction [N] |
-| `damping:=5.0` | `5.0` | Drawer damping [Ns/m] |
-| `mass:=2.0` | `2.0` | Drawer mass [kg] |
-| `gui:=false` | `true` | Run without the Gazebo window |
-
-## 3. Controls
-
-Each run below is one trial. Reset (Section 4) before starting the next one.
-
-### Scripted operator
-
-The script pushes at 0.1 m/s along the drawer axis, rotated by a fixed heading error.
+In **Terminal 1**, press `Ctrl+C`, then run:
 
 ```bash
-# --- inside the container ---
-ros2 run sc_gazebo baseline_direct.py --heading 0     # should succeed
-ros2 run sc_gazebo baseline_direct.py --heading 2     # should lose the handle
+# --- Terminal 1, inside the container ---
+bash ~/SCE_571_ws/scripts/stop_sim.sh
+ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
 ```
 
-To save the results, add `--out trial.json --log trial.csv`.
+Wait for `simulation ready` again, then run the next trial in Terminal 2.
 
-### DualSense controller
-
-Connect the controller by USB. In one container terminal start the controller driver, and in another start the trial:
+### When you're finished
 
 ```bash
-# --- inside the container ---
+# --- Terminal 1, inside the container ---
+bash ~/SCE_571_ws/scripts/stop_sim.sh
+exit
+```
+
+```bash
+# --- on the computer ---
+cd ~/SCE_571_ws
+docker compose down
+```
+
+---
+
+## Trials to try
+
+Run these in **Terminal 2**, with a reset (above) before each one.
+
+| Command | What happens |
+|---|---|
+| `ros2 run sc_gazebo baseline_direct.py --heading 0` | Pulls straight: the drawer opens 0.25 m in about 2.6 s, **success** |
+| `ros2 run sc_gazebo baseline_direct.py --heading 0.5` | 0.5° off: borderline; on the straight drawer it reaches about 0.22 m before the handle is lost |
+| `ros2 run sc_gazebo baseline_direct.py --heading 2` | 2° off: the handle is lost at about 0.11 m, **failure** |
+| `ros2 run sc_gazebo baseline_direct.py --heading 2 --out t.json --log t.csv` | Same trial, and also saves the results and the force over time |
+
+The heading is how far, in degrees, the robot's push points away from the drawer's direction. Even 1° is enough to lose the handle.
+
+**Reading the result line:**
+
+| `status` | Meaning |
+|---|---|
+| `success` | Drawer opened 0.25 m with sideways force under 30 N |
+| `handle_lost` | Sideways force went over 30 N; `final_opening_m` shows how far it got |
+| `timeout` | Not finished within 15 s |
+| `ik_failed` | The robot was asked to reach a position it can't |
+
+**Different drawer direction:** add `yaw:=2.74159` (or `yaw:=3.54159`) to the launch command in Terminal 1. `3.14159`, the default, points straight at the robot.
+
+---
+
+## Controls (DualSense controller)
+
+Connect the controller by USB. Keep the simulation running in Terminal 1, and open two more terminals inside the container (`cd ~/SCE_571_ws` then `docker compose exec dev bash`, then `source ~/SCE_571_ws/ros2_ws/install/setup.bash`):
+
+```bash
+# --- Terminal 2, inside the container: controller driver ---
 ros2 run joy joy_node
+```
+
+```bash
+# --- Terminal 3, inside the container: the trial ---
 ros2 run sc_gazebo baseline_direct.py --joy --timeout 60
 ```
 
 | Control | Action |
 |---|---|
-| **R2 trigger** | Speed and deadman: released = no motion, fully pressed = 0.1 m/s. Press it once to activate it |
-| Left stick, left / right | Move the hand along the robot base x axis (right = +x) |
-| Left stick, up / down | Move the hand along the base y axis (up = +y) |
-| Right stick, up / down | Move the hand up and down (up = +z) |
+| **R2 trigger** | Speed and safety switch: released = robot stays still, fully pressed = full speed (0.1 m/s) |
+| Left stick left / right | Move the hand along the robot's x axis (right = +x) |
+| Left stick up / down | Move the hand along the robot's y axis (up = +y) |
+| Right stick up / down | Move the hand up / down |
 
-With the default scene, **hold the left stick left and squeeze R2** to open the drawer.
+**To open the drawer: hold the left stick to the left and squeeze R2.**
 
-The controller path has been tested only with simulated stick messages, not on a physical DualSense. To try it without a controller, run this instead of `joy_node`:
+The controller mode has been tested only with simulated stick input, not with a physical controller. To try it without a controller, run this in Terminal 2 instead of `joy_node`:
 
 ```bash
-# --- inside the container ---
+# --- Terminal 2, inside the container ---
 python3 ~/SCE_571_ws/scripts/fake_joy.py --lx 1 --r2 -1 --seconds 10
 ```
 
-The stick axis numbers assume a Linux DualSense through `joy_node`. If a real controller moves the wrong way, check them with `ros2 topic echo /joy`.
+If a real controller moves the wrong way, check the stick values with `ros2 topic echo /joy`.
 
-### When a trial ends
+---
 
-The trial stops by itself and prints its results as one line of JSON:
+## If something goes wrong
 
-| `status` | Meaning |
+| Problem | Fix |
 |---|---|
-| `success` | The drawer opened 0.25 m with off-axis force below 30 N |
-| `handle_lost` | Off-axis force went over 30 N (`final_opening_m` shows how far it got) |
-| `timeout` | Time limit reached: 15 s by default, change it with `--timeout` |
-| `ik_failed` | The commanded position is out of the arm's reach |
+| `Command 'host$' not found` (or similar) | Copy only the command, not any label in front of it |
+| No Gazebo window appears | Run `xhost +local:docker` on the computer (not in the container), then launch again |
+| `ros2: command not found` | You're not inside the container, or you skipped `source ~/SCE_571_ws/ros2_ws/install/setup.bash` |
+| The trial command waits and nothing happens | The simulation isn't ready yet: wait for `simulation ready` in Terminal 1 |
+| `ros2` commands fail with `!rclpy.ok()` | Run `ros2 daemon stop`, then try again |
+| A spawn timeout, or the wrong scene appears | Run `bash ~/SCE_571_ws/scripts/stop_sim.sh`, then launch again |
+| A 0° trial fails | Check that the launch used `ideal_gravity_comp:=true` and that you reset first |
+| `permission denied` from Docker | Log out and back in (needed once after installation) |
+| `no configuration file provided` | You're in the wrong folder: run `cd ~/SCE_571_ws` first |
 
-Expected results on the default scene:
+---
 
-| Heading error | Status | Opening reached |
-|---|---|---|
-| 0° | `success` | 0.25 m in about 2.6 s |
-| 2° | `handle_lost` | about 0.11 m |
+## One-time installation
 
-## 4. Reset
+Needed only on a new computer. On this laptop it's already done.
 
-Reset before every trial. It stops the simulation and starts it again with the drawer closed, and takes about 11 s.
+**1. Install Docker, NVIDIA GPU support and the controller permissions** (asks for your password), then log out and back in:
 
-In a container terminal, stop the simulation:
+```bash
+# --- on the computer ---
+cd ~/SCE_571_ws
+bash scripts/setup_host_docker.sh
+```
+
+**2. Check that the robot model folder `ros2_ws/src/franka_description` isn't empty.** If it is, download it:
+
+```bash
+# --- on the computer ---
+cd ~/SCE_571_ws
+git clone --depth 1 --branch 2.9.0 https://github.com/frankaemika/franka_description.git ros2_ws/src/franka_description
+```
+
+**3. Build the container** (downloads about 4 GB) **and the workspace:**
+
+```bash
+# --- on the computer ---
+cd ~/SCE_571_ws
+docker compose build
+docker compose up -d
+docker compose exec dev bash
+```
 
 ```bash
 # --- inside the container ---
-bash ~/SCE_571_ws/scripts/stop_sim.sh
+cd ~/SCE_571_ws/ros2_ws
+colcon build --symlink-install
 ```
 
-Then run the launch command again and wait for `simulation ready`:
+The build should end with `4 packages finished`. Rebuild this way whenever the code changes.
+
+**Requirements:** Linux with an X11 desktop, Docker, and an NVIDIA GPU. Tested on Ubuntu 20.04.
+
+---
+
+## Repeat all 48 experiments
+
+Takes about 20 minutes. The container must be running (`docker compose up -d`), but the simulation must not be: these scripts start and reset it themselves.
 
 ```bash
-# --- inside the container ---
-ros2 launch sc_gazebo sim.launch.py ideal_gravity_comp:=true
-```
-
-Or do both steps from the host, without the Gazebo window:
-
-```bash
-# --- on the host (normal terminal) ---
-bash scripts/run_sim_bg.sh gui:=false ideal_gravity_comp:=true
-```
-
-Always stop the old simulation first. Leftover processes can make the next launch fail or load the wrong scene.
-
-To finish a session:
-
-```bash
-# --- inside the container ---
-bash ~/SCE_571_ws/scripts/stop_sim.sh
-# --- on the host (normal terminal) ---
-docker compose down
-```
-
-## 5. Repeat the experiments
-
-To rerun all 48 trials (about 20 minutes, with the container running):
-
-```bash
-# --- on the host (normal terminal) ---
+# --- on the computer ---
+cd ~/SCE_571_ws
 bash scripts/run_pilot.sh
 python3 scripts/analyze_pilot.py
 ```
 
-Results go to `results/phase3/`. Trials already saved in `results/phase3/trials/` are skipped, so move that folder away to run everything again. `analyze_pilot.py` needs numpy and matplotlib on the host.
-
-## 6. Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| No Gazebo window, or a display error | Run `xhost +local:docker` on the host, then launch again |
-| `permission denied` from Docker | Log out and back in after the installation |
-| `ros2: command not found`, or the package isn't found | Run `source ~/SCE_571_ws/ros2_ws/install/setup.bash`, after building the workspace |
-| `ros2` commands fail with `!rclpy.ok()` | Run `ros2 daemon stop` |
-| The script waits and nothing happens | The simulation isn't ready: wait for `simulation ready` in the launch terminal |
-| Spawn timeout on the first start | Run `stop_sim.sh` and launch again |
-| A trial fails at 0° heading error | Check that `ideal_gravity_comp:=true` was used, and that the simulation was reset first |
+Results go to `results/phase3/`. Trials already saved in `results/phase3/trials/` are skipped, so move that folder elsewhere to run all 48 again.
