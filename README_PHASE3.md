@@ -2,6 +2,8 @@
 
 A simulated Franka Research 3 (FR3) robot holds a drawer handle and must pull the drawer open by 0.25 m. If the robot pushes sideways, the drawer resists. Once that sideways force passes 30 N, the trial counts as failed ("handle lost").
 
+A 57 s video of a successful trial and a failed one is in [docs/phase3_video.mp4](docs/phase3_video.mp4).
+
 The project folder is `~/SCE_571_ws`. ROS 2 and Gazebo run inside a Docker container, so they are not installed on the computer itself.
 
 ---
