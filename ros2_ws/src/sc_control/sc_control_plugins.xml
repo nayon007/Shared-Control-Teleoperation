@@ -1,0 +1,7 @@
+<library path="sc_control">
+  <class name="sc_control/CartesianImpedanceController"
+         type="sc_control::CartesianImpedanceController"
+         base_class_type="controller_interface::ControllerInterface">
+    <description>Cartesian impedance controller on the effort interfaces (paper Eq. 7).</description>
+  </class>
+</library>

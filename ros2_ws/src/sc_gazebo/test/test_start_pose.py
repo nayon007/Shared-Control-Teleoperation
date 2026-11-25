@@ -30,15 +30,19 @@ def test_fk_ready_pose(chain):
     np.testing.assert_allclose(T[:3, 2], [0.0, 0.0, -1.0], atol=1e-3)
 
 
-@pytest.mark.parametrize('kind,yaw,stroke', [
-    ('drawer', np.pi, 0.28),
-    ('drawer', np.pi - 0.4, 0.28),
-    ('drawer', np.pi + 0.4, 0.28),
-    ('door', np.pi, 0.75),
+@pytest.mark.parametrize('kind,x,yaw,stroke', [
+    ('drawer', 0.7, np.pi, 0.28),
+    ('drawer', 0.7, np.pi - 0.4, 0.28),
+    ('drawer', 0.7, np.pi + 0.4, 0.28),
+    ('door', 0.7, np.pi, 0.75),
+    # step 4 onwards: drawer 10 cm further out (teleop.launch.py default)
+    ('drawer', 0.8, np.pi, 0.28),
+    ('drawer', 0.8, np.pi - 0.4, 0.28),
+    ('drawer', 0.8, np.pi + 0.4, 0.28),
 ])
-def test_grasp_and_path(chain, kind, yaw, stroke):
+def test_grasp_and_path(chain, kind, x, yaw, stroke):
     s = np.linspace(0.0, stroke, 15)
-    path = [handle_pose(kind, 0.7, 0.0, 0.4, yaw, v, 0.6) for v in s]
+    path = [handle_pose(kind, x, 0.0, 0.4, yaw, v, 0.6) for v in s]
     q, flipped, reach = solve_grasp(chain, path[0], Q_READY, path=path)
     assert q is not None
     T_goal = path[0] @ FLIP_Z if flipped else path[0]

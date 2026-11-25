@@ -1,0 +1,29 @@
+# Step 8, real FR3 (UNTESTED on hardware). Loaded into franka_ros2's
+# controller_manager by hardware.launch.py. libfranka adds gravity
+# compensation itself, so the controller's own gravity term stays off.
+cartesian_impedance_controller:
+  ros__parameters:
+    joints: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7]
+    base_link: fr3_link0
+    tip_link: fr3_hand_tcp
+    # start softer than in simulation; raise after the first safe runs
+    stiffness: [400.0, 400.0, 400.0, 20.0, 20.0, 20.0]
+    damping:   [40.0, 40.0, 40.0, 1.5, 1.5, 1.5]
+    nullspace_stiffness: 2.0
+    nullspace_damping: 1.0
+    pinv_damping: 0.05
+    joint_limit_margin: 0.3
+    joint_limit_stiffness: 30.0
+    max_trans_error: 0.05
+    max_rot_error: 0.2
+    max_torque_rate: 1.0
+    torque_limit: [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0]
+    gravity_compensation: false
+
+shared_control:
+  ros__parameters:
+    v_max: 0.05
+    ground_truth: false
+    wrench_topic: /sc/external_wrench
+    wrench_sign: -1.0     # O_F_ext_hat_K is the force on the robot
+    perp_leak: 2.0

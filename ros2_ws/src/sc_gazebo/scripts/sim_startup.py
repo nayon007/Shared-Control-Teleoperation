@@ -11,7 +11,10 @@ node
   4. welds the hand to the handle (/sc_weld/attach) and re-commands the hold
      to the configuration actually welded, so the hold controller does not
      keep pulling towards a target the weld no longer allows (pre-load),
-  5. publishes /sim_ready = true (transient local) and keeps it alive.
+  5. with --controller impedance, switches from the joint hold to the
+     Cartesian impedance controller (step 4), which starts at the current
+     pose, so the arm does not move,
+  6. publishes /sim_ready = true (transient local) and keeps it alive.
 """
 
 import argparse
@@ -23,6 +26,8 @@ import rclpy
 import yaml
 from builtin_interfaces.msg import Duration
 from controller_manager_msgs.srv import ConfigureController, LoadController, SwitchController
+from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
+from rcl_interfaces.srv import SetParameters
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from sensor_msgs.msg import JointState
@@ -31,6 +36,7 @@ from std_srvs.srv import Empty, Trigger
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 CONTROLLERS = ['joint_state_broadcaster', 'gripper_controller', 'arm_hold_controller']
+IMPEDANCE = 'cartesian_impedance_controller'
 CM = '/controller_manager'
 
 
@@ -69,11 +75,16 @@ class Startup(Node):
     def step(self, text):
         self.get_logger().info(text)
 
-    def run(self, weld):
-        for name in CONTROLLERS:
+    def run(self, weld, controller='hold', gravity_term=False):
+        names = CONTROLLERS + ([IMPEDANCE] if controller == 'impedance' else [])
+        for name in names:
             if not self.call(LoadController, CM + '/load_controller',
                              LoadController.Request(name=name)).ok:
                 raise RuntimeError('could not load ' + name)
+            if name == IMPEDANCE:
+                value = ParameterValue(type=ParameterType.PARAMETER_BOOL, bool_value=gravity_term)
+                self.call(SetParameters, '/%s/set_parameters' % name, SetParameters.Request(
+                    parameters=[Parameter(name='gravity_compensation', value=value)]))
             if not self.call(ConfigureController, CM + '/configure_controller',
                              ConfigureController.Request(name=name)).ok:
                 raise RuntimeError('could not configure ' + name)
@@ -119,6 +130,17 @@ class Startup(Node):
             rclpy.spin_once(self, timeout_sec=0.05)
             self.hold(self.q, 0.1)
             self.step(res.message)
+        if controller == 'impedance':
+            time.sleep(0.5)
+            req = SwitchController.Request(activate_controllers=[IMPEDANCE],
+                                           deactivate_controllers=['arm_hold_controller'],
+                                           strictness=SwitchController.Request.STRICT,
+                                           activate_asap=True)
+            req.timeout = Duration(sec=5)
+            if not self.call(SwitchController, CM + '/switch_controller', req).ok:
+                raise RuntimeError('could not switch to the impedance controller')
+            self.step('Cartesian impedance controller active (gravity term %s)'
+                      % ('on' if gravity_term else 'off'))
         self.ready_pub.publish(Bool(data=True))
         self.step('simulation ready')
 
@@ -128,6 +150,8 @@ def main():
     ap.add_argument('--positions-file', required=True)
     ap.add_argument('--robot-type', default='fr3')
     ap.add_argument('--weld', default='true')
+    ap.add_argument('--controller', default='hold', choices=['hold', 'impedance'])
+    ap.add_argument('--gravity-term', default='false')
     args, _ = ap.parse_known_args()
     q0 = yaml.safe_load(open(args.positions_file))['initial_positions']
     names = ['%s_joint%d' % (args.robot_type, i) for i in range(1, 8)]
@@ -135,7 +159,8 @@ def main():
     rclpy.init()
     node = Startup(names, [q0['joint%d' % i] for i in range(1, 8)])
     try:
-        node.run(args.weld.lower() == 'true')
+        node.run(args.weld.lower() == 'true', args.controller,
+                 args.gravity_term.lower() == 'true')
     except RuntimeError as e:
         node.get_logger().error(str(e))
         rclpy.shutdown()

@@ -40,3 +40,18 @@ results/phase3/video/frames_h*/
 # Local helper files
 results/.*
 *.xwd
+
+# Generated media and raw trial data stay local; only summary tables and
+# figures shown in the READMEs are in the repository.
+*_run.log
+results/step7/trials/
+results/friction/trials/
+results/friction/videos/
+results/friction/*.mp4
+results/sessions/*
+!results/sessions/sessions.md
+!results/sessions/figures/
+results/sessions/figures/*
+!results/sessions/figures/comparison.png
+!results/sessions/figures/steering.png
+

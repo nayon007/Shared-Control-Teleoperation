@@ -10,6 +10,8 @@ trigger reports opening resistance.
 
 - **Design document (paper):** [LaTeX_Literature_Review/main.tex](LaTeX_Literature_Review/main.tex)
 - **Phase 3 report:** [docs/phase3_report/phase3_report.pdf](docs/phase3_report/phase3_report.pdf) (scenario, baseline, pilot experiments). The folder is a self-contained LaTeX project: run `pdflatex phase3_report.tex` twice there, or upload `docs/phase3_report_overleaf.zip` to Overleaf. `scripts/update_report_figures.sh` refreshes its figures from `results/`.
+- **Shared control, easy guide (steps 4–8):** [README_SHARED_CONTROL.md](README_SHARED_CONTROL.md): drive the robot with the keyboard or a DualSense, with the helper on or off, and feel the haptic feedback.
+- **Phase 3 guide:** [README_PHASE3.md](README_PHASE3.md).
 - **Summary video (57 s):** [docs/phase3_video.mp4](docs/phase3_video.mp4). Rebuild with `python3 scripts/make_video.py` from frames saved by `scripts/record_frames.py`.
 - **Stack:** ROS 2 Humble and Gazebo Classic 11 in **Docker**, on an Ubuntu 20.04 host with an RTX 4090. The same image is used later on the real FR3.
 
@@ -39,6 +41,7 @@ The operator and the shared-control loop arrive in steps 4–5.
 9. [Known issues and fixes](#9-known-issues-and-fixes)
 10. [Real hardware notes (step 8)](#10-real-hardware-notes-step-8)
 11. [Changelog](#11-changelog)
+12. [Objectives check and next steps](#12-objectives-check-and-next-steps)
 
 ---
 
@@ -212,11 +215,11 @@ bash ~/SCE_571_ws/scripts/capture_scenes.sh   # step 2 images and GIFs
 | 2 | FR3 + hand with `ros2_control` for Gazebo; drawer / door model; world; scene camera; launch files; temporary joint hold | [ros2_ws/src/sc_description](ros2_ws/src/sc_description) | ✅ done; 5 tests, headless smoke test, GUI images and GIFs above |
 | 3 | Start pose with the gripper on the handle (IK in `sc_core`); weld plugin (fixed joint hand ↔ `mech_moving`) publishing the handle wrench **F**; deterministic start-up; validation, reachability study | [ros2_ws/src/sc_gazebo](ros2_ws/src/sc_gazebo) | ✅ done; all checks pass for drawer and door (§7.3) |
 | P3 | Course Phase 3: scenario specification, direct teleoperation baseline, reset, 48 pilot trials, report | [docs/phase3_report](docs/phase3_report), `baseline_direct.py`, [results/phase3](results/phase3) | ✅ done (§7.4); DualSense input untested |
-| 4 | Cartesian impedance controller (paper Eq. 7, with gravity compensation τ_g) as a C++ `ros2_control` controller on the effort interfaces (KDL in sim, Franka model on hardware); replaces `arm_hold_controller` | `sc_control` | ⬜ **next** |
-| 5 | ROS 2 nodes: DualSense input, shared-control node (100 Hz, uses `sc_core`, F from `/sc_weld/handle_wrench`), haptics output (pydualsense), logger | `sc_teleop` | ⬜ |
-| 6 | Launch files and parameter YAML for direct / assisted trials, rosbag recording | `sc_bringup` | ⬜ |
-| 7 | Experiments: randomised trials, metrics, plots for the report | `sc_core.metrics` + scripts | ⬜ |
-| 8 | Real hardware: same image on the robot PC (PREEMPT_RT host kernel), `franka_ros2` + `libfranka` matched to the FR3 system image, safety limits | `sc_bringup` (hw launch) | ⬜ |
+| 4 | Cartesian impedance controller τ = Jᵀ(K e − D ẋ) + null-space posture and joint-limit terms (+ optional KDL gravity), as a C++ `ros2_control` controller on the effort interfaces; Lyapunov stability argument; takes over from the joint hold after the weld | [sc_control](ros2_ws/src/sc_control) | ✅ done (§5.4) |
+| 5 | Shared-control node (100 Hz, `sc_core` estimator, fixture, haptics, metrics), DualSense haptics (pydualsense), keyboard input with haptic display, trial logging | [sc_teleop](ros2_ws/src/sc_teleop) | ✅ done; DualSense on USB connected 2026-11-25 (input verified) |
+| 6 | One launch file for direct / assisted runs with keyboard, DualSense or scripted operator; parameter YAML | `sc_teleop/launch/teleop.launch.py`, `config/shared_control.yaml` | ✅ done |
+| 7 | Experiments: scripted direct vs assisted trials, drawer (3 axes) and door, metrics and plots | `run_experiments.sh`, `analyze_step7.py`, [results/step7](results/step7) | ✅ done (§7.5) |
+| 8 | Real hardware: controller and helper configuration for `franka_ros2`, Franka wrench relay, hardware launch | `sc_teleop/launch/hardware.launch.py`, `config/fr3_hardware.yaml` | 🟡 written, **not tested on a robot** (§10) |
 
 **Open decisions:**
 - **Keep `perp_leak` for the trials** (see §7.1)? Recommended: yes.
@@ -363,7 +366,12 @@ change.
 | `/mechanism/joint_states` | `sensor_msgs/JointState` | Gazebo; ground truth q, **logger only** |
 | `/robot_description`, `/mechanism/robot_description` | `std_msgs/String` | robot_state_publisher |
 | `/scene_camera/image_raw` | `sensor_msgs/Image` 1280×800 @ 15 Hz | operator view (block 10) |
-| `/arm_hold_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | temporary joint hold (until step 4) |
+| `/arm_hold_controller/joint_trajectory` | `trajectory_msgs/JointTrajectory` | joint hold (start-up and Phase 3 baseline) |
+| `/cartesian_impedance_controller/target_pose` | `geometry_msgs/PoseStamped`, frame `fr3_link0` | set-point x_d of the impedance controller (step 4) |
+| `/cartesian_impedance_controller/current_pose`, `current_twist` | `geometry_msgs/PoseStamped`, `TwistStamped`, 100 Hz | gripper pose p and twist ṗ (from KDL) |
+| `/joy` | `sensor_msgs/Joy` | DualSense (`joy_node`) or `keyboard_joy.py` |
+| `/sc/haptics` | `std_msgs/Float32MultiArray` | [r, ρ, c, F∥, ‖F⊥‖] from `shared_control` |
+| `/sc/status` | `std_msgs/Float32MultiArray`, 100 Hz | t, opening, true ‖F⊥‖ and F∥, estimated ‖F⊥‖, c, r, ρ, u, v_c, mode (`STATUS_FIELDS`) for the recorder |
 | `/gripper_controller/commands` | `std_msgs/Float64MultiArray` | finger opening [m] |
 | `/apply_joint_effort` | `gazebo_msgs/srv/ApplyJointEffort` | test pushes on `mechanism::mech_joint` |
 | `/sc_weld/handle_wrench` | `geometry_msgs/WrenchStamped`, 500 Hz, best effort | **F**: force of the robot on the handle [N], world (= FR3 base) frame; torque [Nm] about the `mech_moving` origin (drawer: grasp point at q = 0; door: hinge) |
@@ -392,7 +400,9 @@ SCE_571_ws/                               (mounted in the container at /home/dev
     ├── franka_description/               ← git submodule: official FR3 model, pinned to tag 2.9.0 (do not edit)
     ├── sc_core/                          ← step 1: algorithms (pure Python, no ROS dependency)
     ├── sc_description/                   ← step 2: models, world, camera, launch
-    └── sc_gazebo/                        ← step 3: weld plugin, start pose, start-up, checks
+    ├── sc_gazebo/                        ← step 3: weld plugin, start pose, start-up, checks
+    ├── sc_control/                       ← step 4: Cartesian impedance controller (C++ ros2_control plugin)
+    └── sc_teleop/                        ← steps 5, 6, 8: shared-control node, haptics, launch files
 ```
 
 ---
@@ -465,6 +475,50 @@ it. Randomising `yaw` around π randomises the axis, as the paper requires.
 
 ---
 
+### 5.4 `sc_control` (step 4, ament_cmake, C++)
+
+`sc_control/CartesianImpedanceController`, a `ros2_control` controller on the seven effort interfaces, running at 1 kHz:
+
+```
+τ = Jᵀ (K e − D ẋ) + N (k_n (q_n − q) + τ_lim − d_n q̇) [+ τ_g]
+N = I − Jᵀ (J Jᵀ + λ² I)⁻¹ J
+```
+
+| Symbol | Meaning | Simulation value |
+|---|---|---|
+| e | pose error of `fr3_hand_tcp`: position, and rotation vector of R_d Rᵀ; the position part is capped at 0.10 m, the rotation part at 0.3 rad | |
+| ẋ = J q̇ | gripper twist (KDL Jacobian in the base frame) | |
+| K | stiffness, diagonal | 600 N/m, 30 Nm/rad |
+| D | damping, diagonal | 50 N·s/m, 2 N·m·s/rad |
+| N | null-space projector of the redundant joint (damped, λ = 0.05) | |
+| k_n, d_n, q_n | elbow posture spring and damping, towards the configuration at activation | 2 Nm/rad, 1 N·m·s/rad |
+| τ_lim | joint-limit repulsion, −∇ of ½ k_lim Σ max(0, margin − distance)² | margin 0.3 rad, k_lim 30 Nm/rad |
+| τ_g | KDL gravity torque, only when the simulator applies gravity to the arm (`ideal_gravity_comp:=false`); off on the real FR3, where libfranka adds it | off |
+
+Torques are rate-limited to 1 Nm per cycle (as the FR3 requires) and clipped to the joint torque limits. The set-point arrives on `~/target_pose`; on activation it starts at the current pose, so switching from the joint hold does not move the arm. The controller is loaded by `sim_startup.py` when `sim.launch.py` gets `controller:=impedance`; it reads the URDF from the latched `/robot_description` topic.
+
+**Stability (Lyapunov).** With gravity compensated and a fixed set-point, take the energy V = ½ q̇ᵀ M(q) q̇ + ½ eᵀ K e ≥ 0. Using the robot dynamics M q̈ + C q̇ + g = τ + Jᵀ F_env and the skew symmetry of Ṁ − 2C:
+
+```
+V̇ = q̇ᵀ (τ − g) − ẋᵀ K e + q̇ᵀ Jᵀ F_env = −ẋᵀ D ẋ − q̇ᵀ N d_n q̇ + ẋᵀ F_env
+```
+
+Without contact, V̇ ≤ 0 for any positive K and D, and the arm comes to rest at the set-point (LaSalle). In contact with a passive mechanism (friction and damping only take energy out), the closed loop stays passive and therefore stable. The posture spring and τ_lim act through the projector N, which is why they appear here only approximately; they are small and did not affect stability in any run. The paper's Eq. 7 uses JᵀΛ[…] (operational-space inertia shaping); this project uses the simpler Jᵀ[…] form, whose stability proof needs neither Λ nor Coriolis compensation (Takegaki and Arimoto 1981).
+
+### 5.5 `sc_teleop` (steps 5, 6 and 8, ament_python)
+
+| File | Content |
+|---|---|
+| `sc_teleop/shared_control.py` | the shared-control loop (paper Alg. 1) at 100 Hz of simulation time: operator command from `/joy` or a scripted operator → estimator → direct or assisted fixture → off-axis leak → `target_pose`; haptics on `/sc/haptics`; trial check, metrics JSON and time-series CSV. The orientation target follows the measured yaw, so the wrist turns freely with a door |
+| `sc_teleop/session_recorder.py` | records a session: `video.mp4` (scene camera with the live numbers drawn on), `data.csv` from `/sc/status`, `summary.json` with the session metrics |
+| `sc_teleop/dualsense_haptics.py` | `/sc/haptics` → rumble motors (r) and the R2 adaptive trigger in rigid mode (ρ), with pydualsense |
+| `sc_teleop/franka_wrench_relay.py` | step 8: Franka's `o_f_ext_hat_k` → `/sc/external_wrench` |
+| `launch/teleop.launch.py` | everything in one command: simulation with the impedance controller, `shared_control`, and for `input:=dualsense` also `joy_node` and the haptics |
+| `launch/hardware.launch.py` | step 8: controller spawner into `franka_ros2`, relay, `shared_control`, `joy_node`, haptics |
+| `config/shared_control.yaml` | estimator, fixture, haptics and trial parameters; `perp_leak` 2/s (assisted only) |
+| `config/fr3_hardware.yaml` | step 8 gains (softer), wrench source and sign |
+| `test/test_shared_control.py` | quaternion conversion and DualSense mapping |
+
 ## 6. Helper scripts
 
 | Script | Where to run | Purpose |
@@ -479,6 +533,15 @@ it. Randomising `yaw` around π randomises the axis, as the paper requires.
 | [scripts/run_pilot.sh](scripts/run_pilot.sh) | host | Phase 3 pilot trials, each from a full reset |
 | [scripts/analyze_pilot.py](scripts/analyze_pilot.py) | host | pilot summary, table and plots |
 | [scripts/capture_step3.sh](scripts/capture_step3.sh) | host | step 3 images and GIFs |
+| [scripts/keyboard_joy.py](scripts/keyboard_joy.py) | container | drive with the keyboard (publishes `/joy`); shows rumble and trigger bars |
+| [scripts/run_teleop_trial.sh](scripts/run_teleop_trial.sh) | host | one scripted shared-control trial in a fresh simulation |
+| [scripts/run_experiments.sh](scripts/run_experiments.sh) | host | step 7 trials (resumable) |
+| [scripts/analyze_step7.py](scripts/analyze_step7.py) | host | step 7 table and plots |
+| [scripts/drive.sh](scripts/drive.sh) | host | start / stop a recorded DualSense session (`drive.sh assisted 3`, `drive.sh stop`) |
+| [scripts/analyze_sessions.py](scripts/analyze_sessions.py) | host | table, plots and H.264 videos of recorded sessions |
+| [scripts/run_friction_study.sh](scripts/run_friction_study.sh) + [analyze_friction.py](scripts/analyze_friction.py) | host | friction study (§7.6) |
+| [scripts/make_grid_video.py](scripts/make_grid_video.py) | host | 2 or 4 session videos side by side |
+| [scripts/make_session_figures.py](scripts/make_session_figures.py) | host | direct vs assisted figures, plus camera-and-live-plot videos and GIFs of the human sessions |
 | [scripts/capture_scenes.sh](scripts/capture_scenes.sh) | host | step 2 images and GIFs |
 
 ---
@@ -643,10 +706,138 @@ The task is feasible but has almost no margin: the handle is lost after 2.7–5.
 
 **Open points:**
 - The weld force read 9–19% high against a known 10 N push; the cause is not known.
-- An abrupt force jump near 0.20 m of opening in the 0.5° straight trials is unexplained.
+- An abrupt force jump near 0.20 m of opening in the 0.5° straight trials. **Likely explained in step 4:** with the drawer at x = 0.7 m, the last centimetres of the stroke fold the elbow (joint 4) to within 0.13 rad of its limit, where the arm is close to singular. The impedance controller shows the same jump there, and it disappears with the drawer at x = 0.8 m.
 - No human operator has run the task.
 
 The first pilot run was discarded: commands were lost until ROS 2 discovery finished, causing false early failures. `baseline_direct.py` now waits for the link, and all 48 trials were rerun.
+
+### 7.5 Step 7: direct vs assisted with the impedance controller
+
+**Setup:**
+- **Controller:** step 4 impedance controller (600 N/m), with ideal gravity compensation.
+- **Operator:** scripted, pushing at 0.1 m/s along the true initial direction turned by a fixed heading error. It never corrects, and it stops at 0.25 m of opening (arc length for the door).
+- **Failure:** filtered true |F⊥| above 30 N, or a 15 s timeout.
+- **Scenes:** drawer at x = 0.8 m with three axis directions; door with r = 0.6 m.
+- **Conditions:** direct (v_c = u), assisted (fixture plus leak 2/s), and assisted without the leak (the paper baseline).
+- **Trials:** 46 in total, each from a fresh simulation, with `run_experiments.sh`.
+
+| Heading error | Drawer (straight), direct: success, peak F⊥ | Drawer (straight), assisted: success, peak F⊥ |
+|---|---|---|
+| 0° | 2/2, 4.5 N | 2/2, 3.5 N |
+| 5° | 2/2, 11.9 N | 2/2, 2.1 N |
+| 10° | 2/2, 26.1 N | 2/2, 5.1 N |
+| 15° | 0/2 (lost at 0.18 m) | 2/2, 8.3 N |
+| 20° | 0/2 (lost at 0.13 m) | 2/2, 11.4 N |
+| 30° | 0/2 (lost at 0.08 m) | 2/2, 17.5 N |
+
+| Scene | Direct | Assisted | Assisted, no leak |
+|---|---|---|---|
+| Drawer turned ±0.4 rad, 0° / 10° / 20° | 4/6 succeed; both 20° lost at 0.12 m | 6/6, peak ≤ 12.5 N | not run |
+| Door, 0° / 10° / 20° | 0/3; lost at 0.21 / 0.13 / 0.09 m | 3/3, peak 9.9 / 10.0 / 13.5 N | 1/2 (10°: 25 N; 20°: lost at 0.22 m) |
+| **All trials** | **10/21** | **21/21** | 3/4 |
+
+![peak force](results/step7/peak_force.png)
+
+![traces](results/step7/traces.png)
+
+**What the plots show:**
+- In the first 0.7 s both modes are identical: the estimator is still gathering samples, so the confidence c is below c₀ = 0.6 and the operator has full authority.
+- Once c reaches 1, the assisted force falls back to a few newtons: the fixture removes the sideways command, and the leak removes the sideways stretch already built up.
+- In direct mode the force keeps rising in proportion to the sideways drift, about K × s × tan θ.
+
+**Findings:**
+1. **Compliance alone widens the margin.** With the stiff joint PID (Phase 3), the handle was lost from 0.75°. With the 600 N/m impedance controller and direct control, it is lost from 15°.
+2. **The helper closes the gap.**
+   - Assisted control succeeded in all 21 trials up to 30°, on every drawer direction and on the door.
+   - Its peak force stays well below the 30 N limit: 17.5 N at most on the drawer, 13.5 N on the door.
+   - At 5–30° the drawer's peak force is 3–6 times lower than with direct control. At 0° the two modes are about equal.
+3. **The door needs the helper even with a perfect aim.** The scripted operator keeps pushing in the door's initial direction, which turns away from the door's path as it swings. Direct control lost the door at 0°, while assisted control followed the turning tangent.
+4. **The leak matters for the door.**
+   - Without it, the assisted door reached 25 N at 10° and lost the handle at 20°.
+   - The estimator lags the door's turning tangent (paper Eq. 5), and the stretch this lag builds up never decays without the leak.
+5. **The start-up peak is the remaining weakness.** The highest forces in assisted mode (up to 17.5 N at 30°) come from the first 0.7 s, before the estimator is confident.
+
+**Interactive check:** with `teleop.launch.py` and `fake_joy.py --lx 1 --ly 0.5` (a 27° push, like the keyboard sequence `a a a a w w`):
+- **Assisted:** about 3 N off-axis once c = 1.
+- **Direct:** 66 N off-axis.
+
+**Limits:**
+- The operator is scripted and never corrects, so no human has used the system yet.
+- Some conditions have only one or two repetitions.
+- The door direct trial at 0° succeeded (peak 24.9 N) in an earlier test run, so it is close to the limit.
+
+### 7.6 Friction study and recorded sessions
+
+**Setup:** the same scripted operator, on the straight drawer.
+- **Joint friction:** 1, 3, 10, 20 and 30 N. The friction is set with `teleop.launch.py friction:=`.
+- **Heading error:** 0°, 10° and 20°.
+- **Control:** direct and assisted.
+- **Trials:** 30, each recorded by `session_recorder` (video, data, summary). Run with `run_friction_study.sh`; analysed with `analyze_friction.py` and `analyze_sessions.py --root results/friction/videos`.
+
+| Friction | Direct 10° | Assisted 10° | Direct 20° | Assisted 20° | Mean pulling force |
+|---|---|---|---|---|---|
+| 1 N | ✓ 25.8 N | ✓ 4.8 N | lost at 0.133 m | ✓ 10.6 N | 1.5 N |
+| 3 N | ✓ 26.0 N | ✓ 5.2 N | lost at 0.130 m | ✓ 11.2 N | 3.5 N |
+| 10 N | ✓ 27.3 N | ✓ 6.5 N | lost at 0.118 m | ✓ 13.8 N | 10.0 N |
+| 20 N | ✓ 29.0 N | ✓ 8.1 N | lost at 0.101 m | ✓ 17.3 N | 19 N |
+| 30 N | lost at 0.244 m | ✓ 9.9 N | lost at 0.085 m | ✓ 21.0 N | 27 N |
+
+✓ = opened to 0.25 m, with the peak off-axis force. At 0° every trial succeeded, with a peak of at most 4.8 N. **Totals:** assisted 15/15, direct 9/15.
+
+![friction](results/friction/friction.png)
+
+**Findings:**
+1. **Friction raises the off-axis force in both modes.** The drawer only starts to move once the spring force exceeds the friction, which takes up to 5 cm of stretch at 30 N. Until it moves, the whole command builds up as error, including its sideways part. In assisted mode the estimator also needs motion before it gains confidence, so the start-up peak grows with friction (10.6 → 21.0 N at 20°).
+2. **The haptic trigger saturates.** With ρ scaled from 2 to 15 N of pulling force (paper Eq. 8), R2 reads 0 below about 2 N of friction and 1 from 20 N. The scale needs to be tuned from human trials, as the paper itself proposes.
+3. **The videos agree with the logs.** Checked frame by frame: the handle-lost banner appears at the logged opening, and assisted runs end at 0.25 m with about 3 N off-axis.
+
+Video (local only, not in the repository): `results/friction/friction_h20_comparison.mp4`. Direct on the left, assisted on the right; 1 N on top, 30 N below; heading error 20°.
+
+**Recorded sessions (human driving).** Session folders (videos, data, summaries), per-trial data and all videos and GIFs stay on the local machine and are not in the repository; only the summary tables and figures are. With `input:=dualsense` or `keyboard`, `teleop.launch.py` starts `session_recorder` by default. It writes `results/sessions/<UTC time>_<mode>_<kind>_f<friction>/` with `video.mp4` (camera view and live overlay), `data.csv` (`/sc/status` at 100 Hz) and `summary.json`. `scripts/drive.sh` starts, stops and saves sessions from the host, and `analyze_sessions.py` compares them. The DualSense was connected on 2026-11-25, and its rumble and trigger were confirmed by the operator.
+
+**First human session** (2026-11-25, assisted, friction 3 N, 195 s; [sessions.md](results/sessions/sessions.md)):
+- **Session:** 20 strokes (7 full open–close cycles), split by `analyze_sessions.py`.
+- **Steering accuracy:** the operator's stick direction was a median **20°** off the drawer's axis (90th percentile 64°). In the scripted trials, direct control lost the handle from 15°. The fixture removed the off-axis part: the commanded sideways speed fell from about 0.02 to 0.001 m/s.
+- **Off-axis force:** 2.1 N mean while moving. During normal travel the stroke peaks were 2–12 N. The session's single highest value, 19.0 N, came at the instant the drawer hit its end stop at 0.35 m. The force never came close to 30 N.
+- **Haptics:**
+  - Rumble was 0.35–0.5 on most opening strokes, mostly from the rejected-command term (paper Eq. 8): it told the operator they were steering off-axis.
+  - R2 resistance was about 0.1 while the drawer slid (3.5 N pull) and jumped to 1 whenever the operator kept pushing against an end stop (pulling force up to 37 N).
+
+**Four human sessions: direct vs assisted at 3 N and 20 N** (2026-11-25, one operator, DualSense).
+- Made with `make_session_figures.py`, into [results/sessions/figures/](results/sessions/figures/).
+- Every number below comes from `summary.json` and `data.csv`.
+- The videos were checked against the logs: the handle-lost banner and the plotted 30 N crossing coincide.
+
+| Session | Duration | Mean off-axis while moving | Peak off-axis | Time above 30 N | Mean rumble while moving |
+|---|---|---|---|---|---|
+| assisted, 3 N | 195 s, 7 open–close cycles | **2.1 N** | 19.0 N (end-stop impact) | 0 s | 0.24 |
+| direct, 3 N | 80 s, 1 opening, then pushing at the stop | **11.1 N** | 22.4 N | 0 s | 0.51 |
+| assisted, 20 N | 85 s, 3 cycles | **2.1 N** | 11.6 N | 0 s | 0.23 |
+| direct, 20 N | 26 s, 1 opening | **27.1 N** | **47.8 N** | **20.9 s** (handle lost) | 0.87 |
+
+![session comparison](results/sessions/figures/comparison.png)
+
+Videos and GIFs of each session's first opening (camera next to a live off-axis force plot; direct on top, assisted below) are made locally by `make_session_figures.py` in `results/sessions/figures/first_opening_f3.{mp4,gif}` and `first_opening_f20.{mp4,gif}`. They are not in the repository.
+
+![steering](results/sessions/figures/steering.png)
+
+**What the sessions show:**
+1. **The helper cut the off-axis force by 5 to 13 times.** The mean while moving was 2.1 N assisted against 11.1 N (3 N friction) and 27.1 N (20 N friction) direct.
+2. **Only direct control at 20 N lost the handle.** The off-axis force passed 30 N after about 3 s of pulling (21 cm opening) and stayed above it for 21 s, with the rumble at full. Assisted control at 20 N never exceeded 11.6 N.
+3. **The fixture removed most of the operator's sideways command.** The mean sideways speed fell from 0.044 to 0.003 m/s (3 N) and from 0.041 to 0.003 m/s (20 N). In direct mode the robot received the command unchanged (right panel).
+4. **Confound: the operator steered differently in each mode.**
+   - Direct 3 N: median 3° off the axis, carefully, and the first push stopped at 15 cm when the force and rumble rose.
+   - Assisted: median 20° (3 N) and 11° (20 N), with many pushes at 40–60°.
+   - So the helper allowed loose steering, and the rumble seems to have made the operator careful without it. The force ratio mixes both effects. A fair comparison needs a fixed instruction (for example "open as fast as you can") and several operators.
+5. **Limits:** one operator, one session per condition, no fixed order or instruction. These are pilot data, not a user study.
+
+**Bug found and fixed (anti-windup).**
+- **Symptom:** in the direct 20 N session, a short push toward "close" did not move the drawer. After R2 was released, the arm kept pressing into the stop with about 58 N.
+- **Cause:** while the operator pushes against an end stop, the set-point x_d keeps integrating past the stop, so a reversed command first has to unwind it.
+- **Fix:** `shared_control` now keeps x_d within `max_lead` = 0.10 m of the gripper, the controller's own error cap, so the force is unchanged.
+- **Check:** 7 s of pushing into the stop, then a 1 s reverse: the drawer moved back 5 cm, and the force along the drawer fell from 62 N to 0.
+- **What it does not change:** pressing against the stop still reaches about 60 N while the operator keeps pushing (next steps, item 2).
+- **Scope:** the scripted trials in §7.5–7.6 stop before any end stop and are not affected.
 
 ---
 
@@ -656,11 +847,13 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
 |---|---|---|
 | Franka Panda | **FR3** (`franka_description` 2.9.0) | the lab's robot |
 | robosuite / MuJoCo | **ROS 2 Humble + Gazebo Classic 11 in Docker** | a path to the real robot through `ros2_control` / `franka_ros2` |
-| x_d ← x_d + Δt·v_cmd | optional off-axis leak `perp_leak` | removes the start-up residual (Finding 1); default off |
+| x_d ← x_d + Δt·v_cmd | off-axis leak `perp_leak` | removes the start-up residual (Finding 1); 2/s in assisted runs from step 5, 0 in `sc_core.Params` and for direct runs |
+| τ = JᵀΛ[K_p e − K_d ẋ] + τ_g + τ_null | τ = Jᵀ[K e − D ẋ] + N(…) (+ τ_g) with error cap, torque-rate limit and joint-limit repulsion | simpler, with a direct Lyapunov proof; Λ needs the exact inertia (§5.4) |
+| drawer in front of the robot | drawer at x = 0.8 m from step 4 on (door 0.7 m) | at 0.7 m the stroke ends near the elbow limit (§7.4) |
 | wrist F/T sensor | wrench of the gripper–handle weld (`/sc_weld/handle_wrench`) | it is exactly the force on the handle and needs no gravity compensation; on hardware use Franka's `O_F_ext_hat_K` |
 | "welded grasp" in MuJoCo | Gazebo world plugin creating a fixed joint at run time | the mechanism must first be reached and the arm settled; handle loss is registered from F⊥ (optional `break_force`) |
 | Panda start pose (unspecified) | IK start pose ranked by followable stroke | the FR3's joint limits restrict which mechanism poses can be opened (§7.3) |
-| OSC from the start | temporary joint PID hold (`arm_hold_controller`) | keeps the arm up until the Cartesian impedance controller exists (step 4) |
+| OSC from the start | joint PID hold during start-up, impedance controller after the weld | the arm must hold still while the weld closes |
 
 ---
 
@@ -672,7 +865,10 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
 | Every `ros2 …` call fails with `!rclpy.ok()` | stale ROS 2 CLI daemon | `ros2 daemon stop` (the scripts do it) |
 | The wrong mechanism appears (e.g. a door when you asked for a drawer) | processes from a previous launch still publish the old `robot_description` | `bash scripts/stop_sim.sh` before every launch |
 | `spawn_entity` times out on the very first start | Gazebo initialises `~/.gazebo` | launch again |
-| The arm sags right after spawning | controllers start a few seconds after physics | expected: `go_to_start.py` brings it back; the step 4 controller will hold it |
+| The arm sags right after spawning | controllers start a few seconds after physics | expected: `go_to_start.py` brings it back |
+| Impedance controller: the drawer stops near 0.20 m with up to several hundred newtons off-axis | drawer at x = 0.7 m: joint 4 reaches its limit near the end of the stroke | drawer at x = 0.8 m (default of `teleop.launch.py`); joint-limit repulsion in the controller |
+| Impedance controller: direct trials never lose the handle | the error cap (0.05 m × 600 N/m = 30 N) equalled the handle-loss limit | cap raised to 0.10 m (60 N) in simulation |
+| `stop_sim.sh` kills the command that called it | it kills every process whose command line contains `ros2 launch` | start launches with `docker exec -d` in a separate process (`run_sim_bg.sh`, `run_teleop_trial.sh`) |
 | Controllers fail to activate with `paused:=true` | `ros2_control` only updates while physics steps | intended: paused mode skips the spawners and is only for inspecting the start pose |
 | `/apply_joint_effort` "succeeds" but nothing moves | `start_time = 0` means simulation time 0, so a timed effort lies in the past | use `duration: {sec: -1}` (until removed) |
 | Efforts keep acting after `/clear_joint_efforts` | efforts on a joint add up, and in our tests clearing did not remove them | remove an effort by applying its negative (as `record_gif.py` does) |
@@ -695,9 +891,52 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
 - **Force signal:** on hardware, F comes from `O_F_ext_hat_K` (or an external F/T sensor). The `sc_core` convention is the force applied by the robot to the handle.
 - **Container settings:** the container already uses host networking, all devices, `rtprio 99` and unlimited `memlock`, as FCI requires.
 
+**What is ready (untested on a robot):** `sc_teleop/launch/hardware.launch.py` loads the same `CartesianImpedanceController` into `franka_ros2`'s controller manager with [fr3_hardware.yaml](ros2_ws/src/sc_teleop/config/fr3_hardware.yaml), starts `franka_wrench_relay` (O_F_ext_hat_K → `/sc/external_wrench`), `shared_control` without ground truth, `joy_node` and the haptics. Step-by-step instructions are in [README_SHARED_CONTROL.md](README_SHARED_CONTROL.md#real-fr3-step-8-not-tested-on-hardware).
+
+**Hardware differences:**
+- gains 400 N/m and 20 Nm/rad, error cap 5 cm, top speed 0.05 m/s;
+- no τ_g, because libfranka compensates gravity;
+- F = −O_F_ext_hat_K;
+- opening is measured as the distance the gripper travels.
+
+**Before the first run, check:**
+- the `franka_msgs` field name for the external wrench in the installed `franka_ros2` version;
+- that the spawner's `--param-file` option exists in that version;
+- the torque-rate limit against the FCI rejection behaviour.
+
 ---
 
 ## 11. Changelog
+
+- **2026-11-25: Four human DualSense sessions** (direct and assisted, 3 N and 20 N) analysed:
+  - mean off-axis force 2.1 N assisted against 11.1 and 27.1 N direct; only direct at 20 N lost the handle;
+  - new `make_session_figures.py`: comparison figures, synchronised camera-and-plot videos and GIFs;
+  - fixed set-point wind-up at end stops (`max_lead`).
+- **2026-11-25: First recorded human session** (assisted, 3 N) analysed; `analyze_sessions.py` splits sessions into strokes.
+- **2026-11-25: Recording, friction study, objectives check.**
+  - New `session_recorder`: video with a live overlay, a data log and a summary for every keyboard or DualSense run.
+  - New scripts: `drive.sh` (one-command recorded sessions), `analyze_sessions.py`, `make_grid_video.py`.
+  - `teleop.launch.py` gains `friction`, `damping`, `record`, `video` and `sessions_dir`; `shared_control` publishes `/sc/status`.
+  - Friction study (30 recorded trials, §7.6): assisted 15/15, direct 9/15. The haptic trigger scale saturates above about 20 N.
+  - Added the objectives check and next steps (§12).
+
+- **2026-11-25: DualSense connected.**
+  - `joy_node` now runs with `SDL_JOYSTICK_HIDAPI=0` (kernel `hid-playstation` driver). This gives the expected axis order and leaves the HID channel to `pydualsense`.
+  - `/joy` input reaches `shared_control` at about 36 Hz.
+  - The rumble and trigger commands are sent without errors.
+
+- **2026-11-24: Steps 4 to 8.**
+  - **Step 4:** new package `sc_control`, a C++ `ros2_control` Cartesian impedance controller (KDL; null-space posture, joint-limit repulsion, optional gravity term, error cap, torque-rate and torque limits; Lyapunov argument in §5.4). `sim.launch.py controller:=impedance` switches from the joint hold to it after the weld.
+  - **Step 5:** new package `sc_teleop`:
+    - `shared_control` runs the paper's loop on the controller, with the scripted or joystick operator, haptics, metrics and logs, and a 0.5 s joystick timeout;
+    - `dualsense_haptics` drives the rumble and the R2 adaptive trigger;
+    - `keyboard_joy.py` now shows rumble and trigger bars.
+  - **Step 6:** `teleop.launch.py` starts everything with one command (`mode`, `input`, `kind`, `heading`, ...); parameters are in `config/shared_control.yaml`.
+  - **Step 7:** 46 trials (`run_experiments.sh`, `analyze_step7.py`, `results/step7/`). Assisted: 21/21 succeeded; direct: 10/21 (§7.5).
+  - **Step 8:** hardware launch, FR3 gains and the Franka wrench relay. **Not tested on a robot.**
+  - **Drawer position:** the drawer moved to x = 0.8 m for steps 4 onwards. At 0.7 m the elbow folds to its limit near the end of the stroke, which most likely also explains the jump near 0.20 m in Phase 3.
+  - **Docs:** new easy guide [README_SHARED_CONTROL.md](README_SHARED_CONTROL.md).
+  - **Tests:** start-pose tests now include the drawer at x = 0.8 m (8 tests); `sc_teleop` has 4 tests.
 
 - **2026-11-01: Phase 3 complete.**
   - Added the direct teleoperation baseline (`baseline_direct.py`), the `ideal_gravity_comp` option and the success and failure criteria.
@@ -747,3 +986,34 @@ The first pilot run was discarded: commands were lost until ROS 2 discovery fini
 - **2026-10-28: Step 1 done.**
   - Added the `sc_core` library, the offline simulator and 14 tests.
   - Found the start-up residual issue and added the optional `perp_leak`.
+
+---
+
+## 12. Objectives check and next steps
+
+Checked against the design document ([main.tex](LaTeX_Literature_Review/main.tex)), the course Phase 3 brief and the standing project instructions (2026-11-25).
+
+| Objective | Source | Status |
+|---|---|---|
+| Online tangent estimator from the robot's own motion (Lutscher et al. 2010), with speed gate, sign alignment and confidence | paper Sec. 3.3, Eq. 4 | ✅ `sc_core.estimator`, running in Gazebo at 100 Hz |
+| Confidence-weighted guidance virtual fixture | paper Eq. 6 | ✅ `sc_core.assistance`; plus the off-axis leak (§8) |
+| Compliant low-level control | paper Eq. 7 | ✅ Cartesian impedance controller (`sc_control`); simplified to Jᵀ[K e − D ẋ], with a Lyapunov argument (§5.4) |
+| Rumble for off-axis force and rejected command; R2 resistance for opening force | paper Eq. 8 | ✅ implemented and felt on a real DualSense; ⚠ the trigger scale saturates for stiff drawers (§7.6) |
+| Haptic thresholds set from pilot trials | paper Sec. 3.5 | ⚠ still the defaults; needs human sessions |
+| Direct and assisted modes with identical feedback | paper Sec. 3, Conclusion | ✅ same haptics and controller, only the fixture differs |
+| Metrics: opening time, off-axis force, handle loss, opening distance | paper block 11 | ✅ in every trial and session, computed with the ground-truth tangent |
+| Drawers and doors, with the axis unknown to the robot | paper Sec. 3.2 | ✅ drawer at three axis directions, door with r = 0.6 m; ⚠ directions were fixed, not randomised per trial, and only one door radius |
+| User study measuring off-axis force under assistance | paper Sec. 2.6 (the gap it names) | 🟡 pilot: 4 sessions, one operator, direct vs assisted at 3 N and 20 N (§7.6); a real study needs several operators, a fixed instruction and repetitions |
+| Real FR3 | course and project plan, step 8 | ❌ launch and configuration written, not run on a robot |
+| Phase 3: executable scenario with a README (installation, launch, controls, reset), specification, baseline, pilot experiments | course brief | ✅ [README_PHASE3.md](README_PHASE3.md), report, 48 pilots (Gazebo instead of PyBullet, agreed) |
+| README updated after every task; no AI attribution; no personal email | standing instructions | ✅ |
+
+**Next steps, in order:**
+1. **Proper human trials.** Use a fixed task and instruction ("open to 25 cm and close again, quickly, three times"), and alternate the mode order, at 3 N and 20 N. Use several operators if possible; each one runs `drive.sh`, then `analyze_sessions.py` and `make_session_figures.py`.
+2. **End-stop force.** Anti-windup is done, but while the operator keeps pushing at a stop the arm still presses with up to 60 N (the error cap). On hardware, limit the along-axis error once the gripper stalls, for example to 2 cm (12 N).
+3. **Tune the haptics from those sessions.** Set the R2 scale (F∥,0, F∥,1) from the pulling forces actually seen, or scale it to the force at the start of motion. Check that the rumble thresholds (F₀ = 2 N, F₁ = 20 N) separate good and bad steering.
+4. **Reduce the start-up peak.** It is now the largest force in assisted mode (up to 21 N at 30 N friction). Options: seed d̂ with the operator's first command, a faster confidence ramp, or lower the stiffness until c > c₀.
+5. **Broaden the scenes.** Randomise the yaw per trial (hidden from the operator), use more door radii, and put the door in the friction study.
+6. **Final report.** Extend the Phase 3 report with §7.5–7.6 and the human sessions.
+7. **Hardware (step 8).** Run on the lab FR3, slowly, with the user stop in hand: first hold still, then direct mode at 0.02 m/s, then assisted. Check the `franka_ros2` version items listed in §10.
+

@@ -1,9 +1,11 @@
 # Controllers loaded by gazebo_ros2_control.
 #   joint_state_broadcaster  /joint_states
 #   gripper_controller       holds the finger opening
-#   arm_hold_controller      TEMPORARY joint-space PID hold through the effort
-#                            interfaces (steps 2-3 only); replaced by the
-#                            Cartesian impedance controller in step 4
+#   arm_hold_controller      joint-space PID hold through the effort interfaces;
+#                            used during start-up and by the Phase 3 baseline
+#   cartesian_impedance_controller   step 4 (sc_control); takes over from the
+#                            hold after the weld when launched with
+#                            controller:=impedance
 controller_manager:
   ros__parameters:
     update_rate: 1000  # Hz, same as the real FR3
@@ -16,6 +18,9 @@ controller_manager:
 
     arm_hold_controller:
       type: joint_trajectory_controller/JointTrajectoryController
+
+    cartesian_impedance_controller:
+      type: sc_control/CartesianImpedanceController
 
 gripper_controller:
   ros__parameters:
@@ -41,3 +46,22 @@ arm_hold_controller:
       fr3_joint5: {p: 250.0, i: 100.0, d: 10.0, i_clamp: 12.0}
       fr3_joint6: {p: 150.0, i: 100.0, d: 10.0, i_clamp: 12.0}
       fr3_joint7: {p: 50.0,  i: 50.0,  d: 5.0,  i_clamp: 12.0}
+
+# Step 4. tau = J^T (K e - D xdot) + N (k_n (q_n - q) - d_n qdot) [+ tau_g]
+# Targets on /cartesian_impedance_controller/target_pose (frame fr3_link0).
+cartesian_impedance_controller:
+  ros__parameters:
+    joints: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7]
+    base_link: fr3_link0
+    tip_link: fr3_hand_tcp
+    # x y z [N/m], rotation about x y z [Nm/rad], base frame
+    stiffness: [600.0, 600.0, 600.0, 30.0, 30.0, 30.0]
+    damping:   [50.0, 50.0, 50.0, 2.0, 2.0, 2.0]
+    nullspace_stiffness: 2.0
+    nullspace_damping: 1.0
+    pinv_damping: 0.05
+    max_trans_error: 0.10     # [m]   bounds the spring force to K * 0.10 = 60 N
+    max_rot_error: 0.3        # [rad]
+    max_torque_rate: 1.0      # [Nm per 1 ms cycle], as on the real FR3
+    torque_limit: [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0]
+    gravity_compensation: false   # true when the simulator applies gravity to the arm

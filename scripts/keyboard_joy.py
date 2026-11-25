@@ -6,7 +6,9 @@
 Publishes /joy messages exactly like joy_node with a DualSense, so
 `baseline_direct.py --joy` cannot tell the difference. A terminal cannot see
 key releases, so keys set the stick position and it stays there until
-changed; R2 is a toggle.
+changed; R2 is a toggle. With shared_control running, the status line also
+shows the haptic feedback a DualSense would give: rumble (off-axis force)
+and trigger stiffness (force needed to open).
 
     a / d     left stick left / right      (base -x / +x)
     w / s     left stick up / down         (base +y / -y)
@@ -25,6 +27,7 @@ import tty
 
 import rclpy
 from sensor_msgs.msg import Joy
+from std_msgs.msg import Float32MultiArray
 
 STEP = 0.25     # stick change per key press
 
@@ -33,14 +36,19 @@ def clamp(v):
     return max(-1.0, min(1.0, v))
 
 
-def status(lx, ly, ry, r2_on, level, listening):
+def status(lx, ly, ry, r2_on, level, listening, haptics=None):
     trig = 'R2 ON  %3d %%' % round(level * 100) if r2_on else 'R2 off (robot holds still)'
     bar = lambda v: '[' + ''.join('#' if abs(v) * 4 >= i else '.' for i in range(1, 5)) + ']'  # noqa: E731
     left = ('left ' if lx > 0 else 'right' if lx < 0 else '     ') + bar(lx)
     up = ('up  ' if ly > 0 else 'down' if ly < 0 else '    ') + bar(ly)
     z = ('up  ' if ry > 0 else 'down' if ry < 0 else '    ') + bar(ry)
-    trial = 'trial listening' if listening else 'NO TRIAL LISTENING - start baseline_direct.py --joy'
-    return '\r  L %s %s | R %s | %s | %s   ' % (left, up, z, trig, trial)
+    trial = 'trial listening' if listening else 'NO TRIAL LISTENING - start a trial or teleop.launch.py'
+    feel = ''
+    if haptics is not None:
+        r, rho = haptics
+        meter = lambda v: '[' + '#' * round(v * 5) + '.' * (5 - round(v * 5)) + ']'  # noqa: E731
+        feel = ' | rumble %s trigger %s' % (meter(r), meter(rho))
+    return '\r  L %s %s | R %s | %s | %s%s   ' % (left, up, z, trig, trial, feel)
 
 
 def main():
@@ -52,6 +60,11 @@ def main():
     rclpy.init()
     node = rclpy.create_node('keyboard_joy')
     pub = node.create_publisher(Joy, '/joy', 10)
+    feel = {'v': None}
+
+    def on_haptics(msg):
+        feel['v'] = (max(0.0, min(1.0, msg.data[0])), max(0.0, min(1.0, msg.data[1])))
+    node.create_subscription(Float32MultiArray, '/sc/haptics', on_haptics, 10)
     lx = ly = ry = 0.0
     r2_on, level = False, 1.0
 
@@ -88,7 +101,9 @@ def main():
             if r2 == 0.0:
                 r2 = -0.001
             pub.publish(Joy(axes=[lx, ly, 0.0, 0.0, ry, r2], buttons=[0] * 13))
-            sys.stdout.write(status(lx, ly, ry, r2_on, level, pub.get_subscription_count() > 0))
+            rclpy.spin_once(node, timeout_sec=0.0)
+            sys.stdout.write(status(lx, ly, ry, r2_on, level, pub.get_subscription_count() > 0,
+                                    feel['v']))
             sys.stdout.flush()
     except KeyboardInterrupt:
         pass

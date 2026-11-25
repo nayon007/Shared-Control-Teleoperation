@@ -4,6 +4,8 @@ A simulated Franka Research 3 (FR3) robot holds a drawer handle and must pull th
 
 A 57 s video of a successful trial and a failed one is in [docs/phase3_video.mp4](docs/phase3_video.mp4).
 
+The next part of the project (soft controller, helper, haptic feedback, DualSense) has its own guide: [README_SHARED_CONTROL.md](README_SHARED_CONTROL.md).
+
 The project folder is `~/SCE_571_ws`. ROS 2 and Gazebo run inside a Docker container, so they are not installed on the computer itself.
 
 ---

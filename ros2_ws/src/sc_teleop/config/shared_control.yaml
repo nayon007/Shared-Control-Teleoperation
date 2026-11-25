@@ -1,0 +1,19 @@
+# Parameters of the shared-control node (sc_teleop/shared_control.py).
+# Symbols follow the paper; defaults of sc_core.params.Params unless noted.
+shared_control:
+  ros__parameters:
+    v_max: 0.10          # [m/s] full-stick speed
+    beta: 0.05           # estimator low-pass gain (T_f about 0.2 s at 100 Hz)
+    v_min: 0.01          # [m/s] speed gate: slower motion does not update d_hat
+    window: 50           # direction samples (0.5 s)
+    k_min: 0.05          # off-axis gain once confident
+    c0: 0.60             # confidence where assistance starts
+    c1: 0.90             # confidence where assistance is full
+    perp_leak: 2.0       # [1/s] decay of off-axis set-point error once c >= c1
+                         #       (not in the paper; 0 = paper baseline)
+    slip_force: 30.0     # [N] off-axis force counted as handle loss
+    target: 0.25         # [m] opening (arc length for the door) for success
+    timeout: 15.0        # [s] scripted trials
+    follow_yaw: true     # the wrist turns freely about the vertical (door)
+    max_lead: 0.10       # [m] set-point at most this far ahead of the gripper
+                         #     (anti-windup at end stops; equals the controller cap)

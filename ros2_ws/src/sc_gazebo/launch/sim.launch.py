@@ -83,7 +83,9 @@ def start_pose(context):
                                  launch_arguments=forwarded.items()),
         Node(package='sc_gazebo', executable='sim_startup.py', output='screen',
              arguments=['--positions-file', out, '--robot-type', robot_type,
-                        '--weld', arg('weld')],
+                        '--weld', arg('weld'), '--controller', arg('controller'),
+                        '--gravity-term',
+                        'false' if arg('ideal_gravity_comp') == 'true' else 'true'],
              parameters=[{'use_sim_time': True}]),
     ]
     return actions
@@ -109,6 +111,9 @@ def generate_launch_description():
                               description='no gravity on the robot links (tau_g of Eq. 7)'),
         DeclareLaunchArgument('weld', default_value='true',
                               description='weld the hand to the handle after start-up'),
+        DeclareLaunchArgument('controller', default_value='hold',
+                              description='arm controller after the weld: hold (joint PID, '
+                                          'Phase 3 baseline) | impedance (step 4)'),
         DeclareLaunchArgument('stroke', default_value='',
                               description='opening the start pose must be able to follow '
                                           '[m | rad]; default 0.28 m drawer, 0.75 rad door'),
